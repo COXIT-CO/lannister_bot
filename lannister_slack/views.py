@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
-from slack_client import slack_client
+from lannister_slack.slack_client import slack_client
 import json
 
 
