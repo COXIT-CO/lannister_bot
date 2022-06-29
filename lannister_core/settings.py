@@ -19,7 +19,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-
+AUTH_USER_MODEL = "lannister_auth.LannisterUser"
 # Application definition
 
 INSTALLED_APPS = [
