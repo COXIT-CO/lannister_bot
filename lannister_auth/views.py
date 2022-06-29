@@ -1,3 +1,8 @@
-from django.shortcuts import render
+from rest_framework.viewsets import ModelViewSet
+from lannister_auth.serializers import UserSerializer
+from lannister_auth.models import LannisterUser
 
-# Create your views here.
+
+class UserViewSet(ModelViewSet):
+    queryset = LannisterUser.objects.all()
+    serializer_class = UserSerializer
