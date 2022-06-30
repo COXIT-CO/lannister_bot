@@ -10,14 +10,14 @@ NOTE: following models/managers are used for building out the skeleton
 
 class BonusRequest(models.Model):
     class BonusRequestStatus(models.TextChoices):
-        CREATED = "Cr", _("Created")
-        APPROVED = "Appr", _("Approved")
-        REJECTED = "Rj", _("Rejected")
+        CREATED = "Created", _("Created")
+        APPROVED = "Approved", _("Approved")
+        REJECTED = "Rejected", _("Rejected")
         DONE = "Done", _("Done")
 
     class BonusRequestType(models.TextChoices):
-        REFERAL = "Ref", _("Referral")
-        OVERTIME = "Ot", _("Overtime")
+        REFERAL = "Referral", _("Referral")
+        OVERTIME = "Overtime", _("Overtime")
 
     creator = models.ForeignKey(LannisterUser, on_delete=models.PROTECT)
     status = models.CharField(
