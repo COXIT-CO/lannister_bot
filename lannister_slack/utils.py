@@ -14,7 +14,7 @@ def prettify_json(data):
 # def convert_date_to_readable_eu_format(date):
 #     return datetime.strptime(date, "%d-%m-%Y %H:%M")
 
-
+# kinda anti SOLID for now
 class BotMessage:
     def __init__(self, channel, username, collection=None):
         """
@@ -111,4 +111,24 @@ class BotMessage:
             self.body,
             self.button,
         ]
+        return self.response
+
+    def new_request_response_markdown(self):
+        self.header["text"]["text"] = "*Creating new bonus request, HUH?*"
+        self.body["text"][
+            "text"
+        ] = "Pls send info in the following order divided by a comma: bonus-type, description, reviewer first and last name or his username"
+        self.response["blocks"] = [
+            self.divider,
+            self.header,
+            self.divider,
+            self.body,
+            self.divider,
+        ]
+        return self.response
+
+    def edit_request_response_markdown(self):
+        serialize_bonus_request = BonusRequestSerializer(self.collection).data
+        self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
+        self.response["blocks"] = [self.divider, self.body, self.divider]
         return self.response
