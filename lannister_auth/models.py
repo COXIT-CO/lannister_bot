@@ -73,6 +73,7 @@ class Role(models.Model):
     )
 
     id = models.PositiveSmallIntegerField(choices=USER_ROLE_CHOISES, primary_key=True)
+    users = models.ManyToManyField("LannisterUser")
 
     def __str__(self):
         return self.get_id_display()
