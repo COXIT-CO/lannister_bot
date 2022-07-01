@@ -1,3 +1,4 @@
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -6,7 +7,12 @@ from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
 from lannister_slack.models import BonusRequest
 from lannister_slack.serializers import BonusRequestSerializer
-from lannister_slack.utils import prettify_json, BotMessage
+from lannister_slack.utils import (
+    prettify_json,
+    BotMessage,
+    ModalMessage,
+    ShowUserListMessage,
+)
 from lannister_auth.models import LannisterUser, Role
 
 
@@ -23,7 +29,7 @@ BOT_ID = slack_client.api_call("auth.test")["user_id"]
 
 class SlackEventView(APIView):
     """
-    Main event view that handles all events that were enabled in app's dashboard
+    Main event View that handles all events that were enabled in app's dashboard
 
     Events are coming as POST requests
     """
@@ -42,6 +48,55 @@ class SlackEventView(APIView):
             if user_id and BOT_ID != event["user"]:
                 slack_client.chat_postMessage(channel=channel_id, text=text)
         return Response(status=status.HTTP_200_OK)
+
+
+class InteractivesHandler(APIView):
+    """
+    Current view handles all the interactive elements such as button/modal/sending inputs from modal.
+    It's a pretty shitty design, but ask slack api devs, not me
+    https://api.slack.com/apps/A03MMSE5XR8/interactive-messages
+    """
+
+    def post(self, request):
+        loads = json.loads(request.data["payload"])
+        print(json.dumps(loads, indent=4))
+        trigger_id = loads.get("trigger_id")
+        event_type = loads.get("type")
+        # actions = loads.get("actions")
+        if event_type == "view_submission":
+
+            # guess what, there is no other way to parse user's input from modal
+            state_values = loads.get("view").get("state").get("values").values()
+            message_values = [list(item.values()) for item in state_values]
+            messages = [item[0].get("value") for item in message_values]
+            print(messages)
+
+            # do something with acquired messages, might want to implement other checks here before doing business logic
+            return Response(status=status.HTTP_200_OK)
+
+        if event_type == "block_actions":
+            # TODO: handle user's selection of static field aka reviewer's choice etc.
+
+            # if actions["type"] == "static_select":
+            #     selected_reviewer = actions["selected_option"]["text"]["text"]
+            #     reviewer = BonusRequest.objects.get(
+            #         reviewer__username=selected_reviewer
+            #     )
+            #     print(reviewer)
+
+            channel = loads.get("channel").get("id")
+            username = loads.get("channel").get("id")
+            button_text = loads.get("actions")[0].get("text").get("text")
+
+            # check buttons text and determine which modal to open
+            # there are no other unique identifiers for that particular button, probably except timestamps, which is already questionable /shrug
+            if button_text == "Update request":
+                modal = ModalMessage(channel, username)
+                slack_client.views_open(
+                    trigger_id=trigger_id,
+                    view=modal.modal_on_update_request_button_click(),
+                )
+            return Response(status=status.HTTP_200_OK)
 
 
 """
@@ -154,12 +209,24 @@ class ReviewRequestCommandView(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-# class AddReviewerCommandView(APIView):
-#     def post(self, request):
-#         print(prettify_json(request.data))
-#         # username = request.data.get("user_name", None)
-#         channel = request.data.get("channel_id", None)
-#         text = request.data.get("text", None)
+class AddReviewerCommandView(APIView):
+    def post(self, request):
+        print(prettify_json(request.data))
+        username = request.data.get("user_name", None)
+        channel = request.data.get("channel_id", None)
+        # text = request.data.get("text", None)
+        bonus_request = BonusRequest.objects.filter(creator__username=username)
+        print(bonus_request)
+        reviewers = Role.objects.filter(users__in=[2]).first()
+        reviewers_list = ShowUserListMessage(
+            channel=channel,
+            username=username,
+            collection=reviewers,
+            queryset=bonus_request,
+        )
+
+        slack_client.chat_postMessage(**reviewers_list.show_active_requests())
+        return Response(status=status.HTTP_200_OK)
 
 
 class BonusRequestViewSet(ModelViewSet):
