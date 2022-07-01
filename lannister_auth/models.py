@@ -73,6 +73,11 @@ class Role(models.Model):
     )
 
     id = models.PositiveSmallIntegerField(choices=USER_ROLE_CHOISES, primary_key=True)
+    name = models.CharField(
+        max_length=20, choices=USER_ROLE_CHOISES, default=3
+    )  # get_user_display()
+    description = models.CharField(max_length=128, null=True)
+    users = models.ManyToManyField("LannisterUser", related_name="users")
 
     def __str__(self):
         return self.get_id_display()
@@ -84,7 +89,6 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     slack_user_id = models.CharField(max_length=100, blank=True, null=True)
-    birthday = models.DateTimeField(blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     roles = models.ManyToManyField(Role)
