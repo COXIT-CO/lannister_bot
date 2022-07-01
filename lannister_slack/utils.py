@@ -1,5 +1,6 @@
 import json
 from lannister_slack.serializers import BonusRequestSerializer
+from lannister_auth.serializers import RoleSerializer
 
 
 def prettify_json(data):
@@ -16,7 +17,7 @@ def prettify_json(data):
 
 # kinda anti SOLID for now
 class BotMessage:
-    def __init__(self, channel, username, collection=None):
+    def __init__(self, channel, username, collection=None, queryset=None):
         """
         channel = channel_id from where slack's command was invoked
         username = username of a person who's pming the bot
@@ -27,6 +28,7 @@ class BotMessage:
         self.timestamp = ""
         self.username = username
         self.collection = collection
+        self.queryset = queryset
 
         # construct markdown responses,
         # use mutability of dicts to construct text responses
@@ -61,8 +63,20 @@ class BotMessage:
             ],
         }
         self.divider = {"type": "divider"}
+        self.input = {
+            "type": "input",
+            "label": {
+                "type": "plain_text",
+                "text": None,
+            },
+            "element": {
+                "type": "plain_text_input",
+                "multiline": True,
+                # "optional": True
+            },
+        }
         self.response = {
-            # 'blocks' key should always return list of markdown element such as header, body, buttons etc.
+            # 'blocks' key should always return list of markdown elements such as header, body, buttons etc.
             "ts": self.timestamp,
             "channel": self.channel,
             "icon_emoji": self.icon_emoji,
@@ -132,3 +146,113 @@ class BotMessage:
         self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
         self.response["blocks"] = [self.divider, self.body, self.divider]
         return self.response
+
+
+class ModalMessage(BotMessage):
+    def __init__(self, channel, username, collection=None):
+        self.modal_header = {
+            "type": "modal",
+            "submit": {"type": "plain_text", "text": "Submit"},
+            "close": {"type": "plain_text", "text": "Cancel"},
+            "title": {
+                "type": "plain_text",
+                "text": None,  # your modal header text here
+            },
+        }
+        super().__init__(channel, username, collection)
+
+    def modal_on_update_request_button_click(self):
+        """
+        Returns modal when "Update request" button was fired up
+        Usecase: user types /list-requests, returns response with "Update request", user clicks "Update request" and this method should construct modal for this event
+        """
+        self.modal_header["title"]["text"] = "Testing modal"
+        self.input["label"]["text"] = "Type something"
+        self.response["blocks"] = [
+            self.divider,
+            self.input,
+            self.divider,
+            self.input,
+        ]
+        print(json.dumps(self.response))
+        return json.dumps(self.response)
+
+
+class ShowUserListMessage(BotMessage):
+    def __init__(self, channel, username, collection=None, queryset=None):
+        super().__init__(channel, username, collection, queryset)
+
+    def show_active_requests(self):
+        self.header["text"]["text"] = "Select from dropdowns"
+        self.body["text"]["text"] = "Select bonus request:"
+        accessory = {
+            "type": "static_select",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Choose request",
+                "emoji": True,
+            },
+        }
+
+        options = []
+        serialized_requests = []
+        for bonus_request in self.queryset:
+            serialized_request = BonusRequestSerializer(bonus_request).data
+            serialized_requests.append(serialized_request)
+
+        for index, request in enumerate(serialized_requests):
+            options.append(
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "emoji": True,
+                        "text": f"{request['bonus_type'], request['created_at']}",
+                    },
+                    "value": f"value-{index}",
+                }
+            )
+
+        accessory["options"] = options
+        self.body["accessory"] = accessory
+        self.response["channel"] = self.channel
+        self.response["blocks"] = [
+            self.divider,
+            self.header,
+            self.divider,
+            self.body,
+            self.show_reviewers(),
+        ]
+        print(prettify_json(self.response))
+        return self.response
+
+    def show_reviewers(self):
+        accessory_reviewers = {
+            "type": "static_select",
+            "placeholder": {
+                "type": "plain_text",
+                "emoji": True,
+                "text": "Enter reviewer's name",
+            },
+        }
+
+        serialized_reviewers = RoleSerializer(self.collection).data
+        options_reviewers = []
+        for index, item in enumerate(serialized_reviewers.get("users")):
+            options_reviewers.append(
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"{item['username']}",
+                    },
+                    "value": f"value-{index}",
+                }
+            )
+
+        accessory_reviewers["options"] = options_reviewers
+        reviewers_part = {
+            "type": "section",
+            "block_id": "hox2",
+            "text": {"type": "mrkdwn", "text": "Select reviewer", "verbatim": False},
+        }
+        reviewers_part["accessory"] = accessory_reviewers
+        return reviewers_part
