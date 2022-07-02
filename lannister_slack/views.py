@@ -5,7 +5,10 @@ from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
 from lannister_slack.models import BonusRequest
-from lannister_slack.serializers import BonusRequestSerializer
+# from lannister_slack.serializers import BonusRequestSerializer
+from lannister_slack.serializers import BonusRequestAdminSerializer, BonusRequestRewieverSerializer, BonusRequestBaseSerializer
+from rest_framework.permissions import IsAuthenticated
+from permissions import IsUser
 
 import json
 
@@ -52,5 +55,35 @@ class SlackEventView(APIView):
 
 
 class BonusRequestViewSet(ModelViewSet):
+    permission_classes = (IsAuthenticated, IsUser)
     queryset = BonusRequest.objects.all()
-    serializer_class = BonusRequestSerializer
+
+    # serializer_class = BonusRequestSerializer
+
+
+    """
+    TODO: Implement better get_serializer_class
+    """
+    methods = ["GET", "PATCH", "DELETE"]
+    def get_serializer_class(self):
+        if self.request.method in self.methods:
+            if self.request.user.is_superuser:
+                return BonusRequestAdminSerializer
+            elif self.request.user.is_staff: #mock for refactoring after getting permissions
+                return BonusRequestRewieverSerializer
+        return BonusRequestBaseSerializer
+
+    def get_queryset(self):
+        """
+        Another queryset for another groups
+        NOW MOCK TILL HAVEN`T PERMISSIONS AND ROLE IMPLEMENT
+        """
+        queryset = self.queryset.all()
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
+
+
+
+
