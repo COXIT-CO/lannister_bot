@@ -1,4 +1,5 @@
 import json
+import copy
 from lannister_slack.serializers import BonusRequestSerializer
 from lannister_auth.serializers import RoleSerializer
 
@@ -27,6 +28,8 @@ class BotMessage:
         self.icon_emoji = ":robot_face:"
         self.timestamp = ""
         self.username = username
+        # TODO: rename variables for querysets from models, probably should've used *args tho
+        # following variables are used only for passing querysets to them. Example: collection could be a queryset of all bonus requests of the user
         self.collection = collection
         self.queryset = queryset
 
@@ -34,14 +37,13 @@ class BotMessage:
         # use mutability of dicts to construct text responses
 
         self.header = {
-            "type": "section",
+            "type": "header",
             "text": {
-                "type": "mrkdwn",
+                "type": "plain_text",
                 "text": None,
             },
         }
-        # header and body are the same in the structure (they're sections)
-        # but split data into them for visibility
+
         self.body = {
             "type": "section",
             "text": {
@@ -50,7 +52,7 @@ class BotMessage:
             },
         }
 
-        # NOTE: buttons are interactive (using events) and
+        # NOTE: buttons are interactive and
         # they're using Block kit https://api.slack.com/start/building/bolt-python#listening
 
         self.button = {
@@ -71,8 +73,17 @@ class BotMessage:
             },
             "element": {
                 "type": "plain_text_input",
-                "multiline": True,
+                "multiline": False,
                 # "optional": True
+            },
+        }
+        self.accessory = {
+            "type": "static_select",
+            "action_id": "select_request",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Choose request",
+                "emoji": True,
             },
         }
         self.response = {
@@ -82,6 +93,8 @@ class BotMessage:
             "icon_emoji": self.icon_emoji,
             "blocks": [],
         }
+
+        # TODO: refactor by adding assessory and options
 
     def register_response_markdown(self):
         self.header["text"]["text"] = f"*Hey, {self.username}, want to register?*"
@@ -125,6 +138,7 @@ class BotMessage:
             self.body,
             self.button,
         ]
+        print(prettify_json(self.response))
         return self.response
 
     def new_request_response_markdown(self):
@@ -141,16 +155,17 @@ class BotMessage:
         ]
         return self.response
 
-    def edit_request_response_markdown(self):
-        serialize_bonus_request = BonusRequestSerializer(self.collection).data
-        self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
-        self.response["blocks"] = [self.divider, self.body, self.divider]
-        return self.response
+    # def edit_request_response_markdown(self):
+    #     serialize_bonus_request = BonusRequestSerializer(self.collection).data
+    #     self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
+    #     self.response["blocks"] = [self.divider, self.body, self.divider]
+    #     return self.response
 
 
 class ModalMessage(BotMessage):
     def __init__(self, channel, username, collection=None):
-        self.modal_header = {
+        super().__init__(channel, username, collection)
+        self.response = {
             "type": "modal",
             "submit": {"type": "plain_text", "text": "Submit"},
             "close": {"type": "plain_text", "text": "Cancel"},
@@ -159,40 +174,62 @@ class ModalMessage(BotMessage):
                 "text": None,  # your modal header text here
             },
         }
-        super().__init__(channel, username, collection)
 
     def modal_on_update_request_button_click(self):
         """
         Returns modal when "Update request" button was fired up
         Usecase: user types /list-requests, returns response with "Update request", user clicks "Update request" and this method should construct modal for this event
         """
-        self.modal_header["title"]["text"] = "Testing modal"
+        self.response["title"]["text"] = "Testing modal"
+
         self.input["label"]["text"] = "Type something"
+
+        # example of manual block_id / action_id assignment idk if there is a reason to do so.
+        first_input = copy.deepcopy(self.input)
+        second_input = copy.deepcopy(self.input)
+        first_input["block_id"] = "update_first_request_input"
+        first_input["element"]["action_id"] = "update_first_request"
+        second_input["block_id"] = "update_second_request_input"
+        second_input["element"]["action_id"] = "update_second_request"
+
+        self.response
+        self.response["blocks"] = [
+            self.divider,
+            # self.input,
+            first_input,
+            self.divider,
+            # self.input,
+            second_input,
+        ]
+        print(f"modal: {prettify_json(self.response)}")
+        return self.response
+
+    def modal_on_bonus_request_edit(self):
+        self.input["label"]["text"] = "Placeholder"
+        self.response["title"]["text"] = "Edit bonus request"
         self.response["blocks"] = [
             self.divider,
             self.input,
             self.divider,
             self.input,
         ]
-        print(json.dumps(self.response))
-        return json.dumps(self.response)
+        print(prettify_json(self.response))
+        return self.response
 
 
-class ShowUserListMessage(BotMessage):
+class MessageWithDropdowns(BotMessage):
+    """
+    Example: https://cutt.ly/LK0TNyW
+    """
+
     def __init__(self, channel, username, collection=None, queryset=None):
+
         super().__init__(channel, username, collection, queryset)
 
     def show_active_requests(self):
         self.header["text"]["text"] = "Select from dropdowns"
+        self.body["block_id"] = "bonus_request"
         self.body["text"]["text"] = "Select bonus request:"
-        accessory = {
-            "type": "static_select",
-            "placeholder": {
-                "type": "plain_text",
-                "text": "Choose request",
-                "emoji": True,
-            },
-        }
 
         options = []
         serialized_requests = []
@@ -206,14 +243,14 @@ class ShowUserListMessage(BotMessage):
                     "text": {
                         "type": "plain_text",
                         "emoji": True,
-                        "text": f"{request['bonus_type'], request['created_at']}",
+                        "text": f"{request['bonus_type']} by: {request['creator']['username']} at {request['created_at']}",
                     },
                     "value": f"value-{index}",
                 }
             )
 
-        accessory["options"] = options
-        self.body["accessory"] = accessory
+        self.accessory["options"] = options
+        self.body["accessory"] = self.accessory
         self.response["channel"] = self.channel
         self.response["blocks"] = [
             self.divider,
@@ -228,6 +265,7 @@ class ShowUserListMessage(BotMessage):
     def show_reviewers(self):
         accessory_reviewers = {
             "type": "static_select",
+            "action_id": "select_reviewer",
             "placeholder": {
                 "type": "plain_text",
                 "emoji": True,
@@ -251,8 +289,38 @@ class ShowUserListMessage(BotMessage):
         accessory_reviewers["options"] = options_reviewers
         reviewers_part = {
             "type": "section",
-            "block_id": "hox2",
+            "block_id": "reviewer",
             "text": {"type": "mrkdwn", "text": "Select reviewer", "verbatim": False},
         }
         reviewers_part["accessory"] = accessory_reviewers
         return reviewers_part
+
+    def show_bonus_requests_by_user(self):
+        bonus_requests = []
+        dropdown_choices = []
+        for item in self.collection:
+            serialized_bonus_request_by_user = BonusRequestSerializer(item).data
+            bonus_requests.append(serialized_bonus_request_by_user)
+
+        for index, bonus_request in enumerate(bonus_requests):
+            option = {
+                "text": {
+                    "type": "plain_text",
+                    "text": f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']}",
+                },
+                "value": f"value-{index}",
+            }
+            dropdown_choices.append(option)
+        self.header["text"]["text"] = "Select bonus request to edit"
+        self.accessory["action_id"] = "edit_request"
+        self.accessory["options"] = dropdown_choices
+        self.body["text"]["text"] = "Pick one:"
+        self.body["accessory"] = self.accessory
+        self.response["blocks"] = [
+            self.divider,
+            self.header,
+            self.body,
+        ]
+        print(prettify_json(self.response))
+
+        return self.response
