@@ -10,6 +10,11 @@ NOTE: following models/managers are used for building out the skeleton
 """
 
 
+
+def get_default_request_status():
+    """ get a default value for request status; create new status if not available """
+    return BonusRequestStatus.objects.get_or_create(name="created")[0]
+
 class BonusRequest(models.Model):
     # class BonusRequestStatus(models.TextChoices):
     #     CREATED = "Cr", _("Created")
@@ -23,16 +28,17 @@ class BonusRequest(models.Model):
 
     creator = models.ForeignKey(LannisterUser, on_delete=models.PROTECT)
     status = models.ForeignKey(
-        "BonusRequestStatus", related_name="statuses", on_delete=models.CASCADE
+        "BonusRequestStatus", related_name="statuses", on_delete=models.CASCADE,
+        defauld=get_default_request_status()
     )
     reviewer = models.ForeignKey(
         LannisterUser, related_name="reviewer", on_delete=models.SET_NULL, null=True
     )
     bonus_type = models.CharField(max_length=50, choices=BonusRequestType.choices)
     description = models.CharField(max_length=255, blank=False)
-    created_at = models.DateTimeField(auto_now=True)
-    updated_at = models.DateTimeField(auto_now_add=True)
-    price_usd = models.DecimalField(max_digits=10, decimal_places=3)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=3, null=True)
     payment_date = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
@@ -47,11 +53,19 @@ class BonusRequest(models.Model):
         self.reviewer = reviewer
         super().save(*args, **kwargs)
 
+
     def __str__(self):
         return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
 
+    class Meta:
+        db_table = "bonus_requests"
+
 
 # TODO: implement history
+
+"""
+TODO: Refactor request history
+"""
 class BonusRequestsHistory(models.Model):
     bonus_request = models.ForeignKey(
         BonusRequest, related_name="requests", on_delete=models.PROTECT
@@ -61,6 +75,7 @@ class BonusRequestsHistory(models.Model):
         return f"Request id: {self.bonus_request.pk}, opened by {self.bonus_request.creator}"
 
     class Meta:
+        db_table = "bonus_requests_history"
         verbose_name_plural = "Bonus requests history"
 
 
@@ -71,10 +86,13 @@ class BonusRequestStatus(models.Model):
         return self.status_name
 
     class Meta:
+        db_table = "bonus_requests_status"
         verbose_name = "Bonus status"
         verbose_name_plural = "Bonus statuses"
 
-
+"""
+TODO: Refactor history creating
+"""
 def create_history(sender, instance, created, *args, **kwargs):
     if created:
         BonusRequestsHistory.objects.get_or_create(bonus_request=instance)
