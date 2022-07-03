@@ -1,7 +1,9 @@
 import json
 import copy
+from lannister_auth.models import LannisterUser
+from lannister_slack.models import BonusRequest
 from lannister_slack.serializers import BonusRequestSerializer
-from lannister_auth.serializers import RoleSerializer
+from lannister_auth.serializers import RoleSerializer, UserSerializer
 
 
 def prettify_json(data):
@@ -57,11 +59,13 @@ class BotMessage:
 
         self.button = {
             "type": "actions",
+            "block_id": None,
             "elements": [
                 {
                     "type": "button",
                     "text": {"type": "plain_text", "text": None},
-                }
+                    "action_id": None,
+                },
             ],
         }
         self.divider = {"type": "divider"}
@@ -86,9 +90,47 @@ class BotMessage:
                 "emoji": True,
             },
         }
+        self.option = {
+            "text": {
+                "type": "plain_text",
+                "text": None,
+            },
+            "value": None,
+        }
+        self.dropdown_in_modal = {
+            "type": "input",
+            "label": {
+                "type": "plain_text",
+                "text": None,
+            },
+            "element": {"type": "static_select", "options": []},
+        }
+        self.multiline_plain_text_input = {
+            "type": "input",
+            "element": {
+                "type": "plain_text_input",
+                "multiline": True,
+                "action_id": "plain_text_input-action",
+            },
+            "label": {"type": "plain_text", "text": "Label", "emoji": True},
+        }
+        self.datepicker = {
+            "type": "input",
+            "element": {
+                "type": "datepicker",
+                "initial_date": "2022-07-01",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select a date",
+                    "emoji": True,
+                },
+                "action_id": "datepicker-action",
+            },
+            "label": {"type": "plain_text", "text": None, "emoji": True},
+        }
         self.response = {
             # 'blocks' key should always return list of markdown elements such as header, body, buttons etc.
-            "ts": self.timestamp,
+            "timestamp": self.timestamp,
             "channel": self.channel,
             "icon_emoji": self.icon_emoji,
             "blocks": [],
@@ -130,6 +172,8 @@ class BotMessage:
             response_text.append(construct_text_response)
 
         self.body["text"]["text"] = f"{''.join(item for item in response_text)}"
+        self.button["block_id"] = "update_request_from_list"
+        self.button["elements"][0]["action_id"] = "update_request_from_list"
         self.button["elements"][0]["text"]["text"] = "Update request"
         self.response["blocks"] = [
             self.divider,
@@ -155,6 +199,27 @@ class BotMessage:
         ]
         return self.response
 
+    def access_denied(self):
+        # TODO: make this method reusable for different roles
+        # TODO: add new account without admin privileges and test it out
+        self.body["text"]["text"] = "You have to be an *admin* to use this command"
+        self.response["blocks"] = [self.divider, self.body]
+        return self.response
+
+    def list_users(self):
+        users = LannisterUser.objects.all()
+        serialized_users = [UserSerializer(user).data for user in users]
+        self.header["text"]["text"] = "List of users and their roles"
+        self.response["blocks"] = [self.divider, self.header, self.divider]
+        for user in serialized_users:
+            users_data = copy.deepcopy(self.body)
+            users_data["text"][
+                "text"
+            ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*"
+            self.response["blocks"].append(users_data)
+        print(prettify_json(self.response))
+        return self.response
+
     # def edit_request_response_markdown(self):
     #     serialize_bonus_request = BonusRequestSerializer(self.collection).data
     #     self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
@@ -173,6 +238,14 @@ class ModalMessage(BotMessage):
                 "type": "plain_text",
                 "text": None,  # your modal header text here
             },
+        }
+        self.option = {
+            "text": {
+                "type": "plain_text",
+                "emoji": True,
+                "text": None,
+            },
+            "value": None,
         }
 
     def modal_on_update_request_button_click(self):
@@ -215,6 +288,35 @@ class ModalMessage(BotMessage):
         ]
         print(prettify_json(self.response))
         return self.response
+
+    def modal_on_new_bonus_request(self):
+        self.response["title"]["text"] = "New bonus request"
+        bonus_requests = BonusRequest.objects.all()
+        bonus_types = set([item.bonus_type for item in bonus_requests])
+        options = []
+        for index, bonus_type in enumerate(bonus_types):
+            option = copy.deepcopy(self.option)
+            option["text"]["text"] = bonus_type
+            option["value"] = f"value-{index}"
+            options.append(option)
+        self.dropdown_in_modal["label"]["text"] = "Select bonus type"
+        self.dropdown_in_modal["element"]["options"] = options
+        self.dropdown_in_modal["element"]["action_id"] = "new_bonus_request_modal_type"
+        self.multiline_plain_text_input["element"][
+            "action_id"
+        ] = "new_bonus_request_modal_description"
+        self.multiline_plain_text_input["label"]["text"] = "Add a description"
+        self.datepicker["label"]["text"] = "Pick a payment date"
+        self.response["blocks"] = [
+            self.divider,
+            self.dropdown_in_modal,
+            self.multiline_plain_text_input,
+            self.datepicker,
+        ]
+        # add reviewer input
+        print(prettify_json(self.response))
+        return self.response
+        # bonus_type_field =
 
 
 class MessageWithDropdowns(BotMessage):
@@ -323,4 +425,53 @@ class MessageWithDropdowns(BotMessage):
         ]
         print(prettify_json(self.response))
 
+        return self.response
+
+    def remove_reviewer_role_from_user(self):
+        self.accessory["action_id"] = "select_user_to_remove_from_reviewers"
+        self.accessory["placeholder"]["text"] = "Select user to unassign."
+        self.body["text"][
+            "text"
+        ] = "Pick reviewer to unassign.\n*Note: after user was removed, rerun the command*"
+        self.body["accessory"] = self.accessory
+        self.button["block_id"] = "confirm_unassign"
+        self.button["elements"][0]["action_id"] = "confirm_unassign"
+        self.button["elements"][0]["text"]["text"] = "Confirm unassign"
+        reviewers_qs = LannisterUser.objects.filter(roles=2)
+        reviewers = [UserSerializer(reviewer).data for reviewer in reviewers_qs]
+        dropdown_choices = []
+        for index, reviewer in enumerate(reviewers):
+            option = {
+                "text": {
+                    "type": "plain_text",
+                    "text": f"Reviewer: {reviewer['username']}, {reviewer['first_name']} {reviewer['last_name']}",
+                },
+                "value": f"value-{index}",
+            }
+            dropdown_choices.append(option)
+        self.accessory["options"] = dropdown_choices
+        self.response["blocks"] = [self.divider, self.body, self.button]
+        print(prettify_json(self.response))
+        return self.response
+
+    def review_request_dropdown(self):
+        self.header["text"]["text"] = "Review bonus request"
+        self.body["text"]["text"] = "Select request to review"
+        self.accessory["action_id"] = "select_request_to_review"
+        not_reviewed_requests_qs = BonusRequest.objects.filter(status="Created")
+        not_reviewed_requests = [
+            BonusRequestSerializer(item).data for item in not_reviewed_requests_qs
+        ]
+        options = []
+        for index, item in enumerate(not_reviewed_requests):
+            option = copy.deepcopy(self.option)
+            option["text"][
+                "text"
+            ] = f"{item['creator']['username']}'s request. Bonus type: {item['bonus_type']}"
+            option["value"] = f"value-{index}"
+            options.append(option)
+        self.accessory["options"] = options
+        self.body["accessory"] = self.accessory
+        self.response["blocks"] = [self.header, self.divider, self.body]
+        print(prettify_json(self.response))
         return self.response
