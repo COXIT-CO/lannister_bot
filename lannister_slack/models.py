@@ -32,19 +32,24 @@ class BonusRequest(models.Model):
     description = models.CharField(max_length=255, blank=False)
     created_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now_add=True)
-    payment_date = models.DateTimeField(null=True)
+    payment_date = models.DateField(null=True)
 
     def save(self, *args, **kwargs):
-        reviewer = LannisterUser.objects.get(username=self.reviewer.username)
-        is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
-        if not is_reviewer:
-            raise ValueError(
-                _(
-                    "Selected user is not a reviewer. Select a valid user with reviewer role."
+        try:
+            reviewer = LannisterUser.objects.get(username=self.reviewer.username)
+            is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
+            if not is_reviewer:
+                raise ValueError(
+                    _(
+                        "Selected user is not a reviewer. Select a valid user with reviewer role."
+                    )
                 )
-            )
-        self.reviewer = reviewer
-        super().save(*args, **kwargs)
+            self.reviewer = reviewer
+        except AttributeError:
+            # if reviewer is null
+            pass
+        finally:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
