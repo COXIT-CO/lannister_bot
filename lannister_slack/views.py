@@ -13,13 +13,14 @@ from lannister_slack.utils import (
     BotMessage,
     ModalMessage,
     MessageWithDropdowns,
+    get_all_bonus_request_statuses,
 )
 from lannister_auth.models import LannisterUser, Role
 
 
 @api_view(["POST"])
 def respond_to_challenge(request):
-    """View to respond to slack's request URL verification"""
+    """View to respond to slack's request URL verification, add it to urls.py when needed"""
     print(request.data)
     return Response(request.data["challenge"], status=status.HTTP_200_OK)
 
@@ -49,6 +50,7 @@ class SlackEventView(APIView):
     def post(self, request):
         """
         Echoes user's message written into bot's private messages or #slack-app channel
+        Hanging for now.
         """
         # print(f"Event: {prettify_json(request.data)}")
         # event = request.data["event"]
@@ -76,21 +78,19 @@ class InteractivesHandler(APIView):
         username = loads.get("user").get("username")
         event_type = loads.get("type")
 
-        trigger_id = loads.get("trigger_id")
+        # trigger_id = loads.get("trigger_id")
         # modal_action_id = loads.get("view").get("blocks")
         if event_type == "view_submission":
 
             """
-            Modal event is happening here
+            Modal events are happening here
             """
-            # TODO: refactor message format in utils, send state values explicitly in human-readable format
 
             """
                 Following code parses and processes automatically generated 'block_id' and 'action_id' by slack
-                if you didn't provide 'block_id' and 'action_id' explicitly
+                if you didn't provide 'block_id' and 'action_id' explicitly, slack shouldn't render your modal and should raise SlackApiError or some similar exception
                 Might be helpful if you have dozen of input fields.
             """
-
             acquired_from_modal_messages = list(
                 loads.get("view").get("state").get("values").values()
             )
@@ -113,7 +113,6 @@ class InteractivesHandler(APIView):
                 provided_pay_date_datetime = datetime.strptime(
                     provided_pay_date_str, "%Y-%m-%d"
                 )
-                print(f"datetime: {provided_pay_date_datetime}")
                 user = LannisterUser.objects.get(username=username)
                 reviewer = LannisterUser.objects.get(username=provided_reviewer)
                 new_bonus_request = BonusRequest.objects.create(
@@ -124,10 +123,13 @@ class InteractivesHandler(APIView):
                     payment_date=provided_pay_date_datetime,
                 )
                 new_bonus_request.save()
-                print("saved")
-                # channel id is not available in interactions with modal idk why, TODO: find some workaround to send message to the user that something actually happened
-                # response_msg = BotMessage(channel="D03MK2ADT29", username=username)
-                # slack_client.chat_postMessage()
+                channel_id = loads.get("view").get("blocks")[0].get("block_id")
+                bot_message = BotMessage(channel=channel_id, username=username)
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "Bonus request was registered successfully"
+                    )
+                )
                 return Response(status=status.HTTP_200_OK)
 
             if (
@@ -150,19 +152,23 @@ class InteractivesHandler(APIView):
                     .get("edit_request_description_from_modal")
                     .get("value")
                 )
-                bonus_request = BonusRequest.objects.get(id=request_id)
 
-                # might not trigger a model signal, beware
-                bonus_request.__class__.objects.update(
-                    bonus_type=bonus_type, description=description
-                )
+                bonus_request = BonusRequest.objects.get(id=request_id)
+                bonus_request.bonus_type = bonus_type
+                bonus_request.description = description
+                bonus_request.save()
+
                 channel_id = (
                     loads.get("view").get("blocks")[0].get("block_id")
                 )  # see comment in utils.py modal_on_bonus_request_edit() method
+                bot_message = BotMessage(channel=channel_id, username=username)
                 slack_client.chat_postMessage(
-                    channel=channel_id, text="Updated successfully"
+                    **bot_message.base_styled_message(
+                        "*Bonus request updated successfully*"
+                    )
                 )
                 return Response(status=status.HTTP_200_OK)
+
             # find all the fields that were sent from modal element
             message_values = [item.values() for item in acquired_from_modal_messages]
             messages_from_modal = [item[0].get("value") for item in message_values]
@@ -187,14 +193,19 @@ class InteractivesHandler(APIView):
 
             if action_id == "select_request" or action_id == "select_reviewer":
                 if request_from_dropdown and reviewer_from_dropdown:
+                    bot_message = BotMessage(channel=channel_id, username=username)
+
                     if request_from_dropdown.get("select_request").get(
                         "selected_option"
                     ) and reviewer_from_dropdown.get("select_reviewer").get(
                         "selected_option"
                     ):
                         HANGING_INPUT_FIELD = False
+
                         slack_client.chat_postMessage(
-                            channel=channel_id, text="Sent successfully"
+                            **bot_message.base_styled_message(
+                                "*Reviewer assigned successfully.\nHe'll get notification #TODO*"
+                            )
                         )
                         return Response(status=status.HTTP_200_OK)
 
@@ -206,7 +217,9 @@ class InteractivesHandler(APIView):
                         HANGING_INPUT_FIELD = True
                         # add styling from class
                         slack_client.chat_postMessage(
-                            channel=channel_id, text="Select one more"
+                            **bot_message.base_styled_message(
+                                "Fill out next option to proceed"
+                            )
                         )
                         return Response(status=status.HTTP_200_OK)
 
@@ -228,8 +241,6 @@ class InteractivesHandler(APIView):
                     id=int(find_request_id)
                 )
                 print(bonus_request_from_dropdown)
-                # render modal
-
                 modal = ModalMessage(channel_id, username)
                 slack_client.views_open(
                     trigger_id=loads.get("trigger_id"),
@@ -242,10 +253,8 @@ class InteractivesHandler(APIView):
                 action_id == "select_user_to_remove_from_reviewers"
                 or action_id == "confirm_unassign"
             ):
-                print(action_id)
                 # protecting data from being used when interactive event fires up and only being selected in dropdown but button wasn't clicked
                 if action_id == "confirm_unassign":
-                    # I have no idea what is a element in 'state': {"values": "somerandomshit"}, it's not documented so I had to find it this way
                     find_selected_username_to_unassign = (
                         loads.get("state").get("values").values()
                     )
@@ -260,23 +269,86 @@ class InteractivesHandler(APIView):
                     )
                     user_to_unassign.roles.remove(2)
                     user_to_unassign.save()
+                    bot_message = BotMessage(channel=channel_id, username=username)
                     slack_client.chat_postMessage(
-                        channel=channel_id, text="Unassigned successfully"
+                        **bot_message.base_styled_message(
+                            message="*Reviewer was successfully removed*"
+                        )
                     )
                     return Response(status=status.HTTP_200_OK)
 
-            else:
-                button_text = loads.get("actions")[0].get("text").get("text")
-                # check buttons text and determine which modal to open
-                # there are no other unique identifiers for that particular button, probably except timestamps, which is already questionable /shrug
-                if button_text == "Update request":
-                    modal = ModalMessage(channel_id, username)
-                    slack_client.views_open(
-                        trigger_id=trigger_id,
-                        view=modal.modal_on_update_request_button_click(),
+            if action_id == "update_request_from_list":
+                modal = ModalMessage(channel_id, username)
+                bot_message = BotMessage(channel_id, username)
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*Use /edit-request to edit your bonus request*"
                     )
+                )
+                # slack_client.views_open(
+                #     trigger_id=trigger_id,
+                #     view=modal.modal_on_update_request_button_click(),
+                # )
                 return Response(status=status.HTTP_200_OK)
 
+            if action_id == "confirm_register":
+                user = LannisterUser.objects.get(username=username)
+                user.slack_user_id = loads.get("user").get("id")
+                user.save()
+                bot_message = BotMessage(channel=channel_id, username=username)
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*Thanks for registering in Lannister.*\n *Fill your first bonus request with /new-request*"
+                    )
+                )
+                return Response(status=status.HTTP_200_OK)
+            if (
+                action_id == "select_status_type"
+                or action_id == "select_request_to_review"
+            ):
+                request_to_review = (
+                    loads.get("state").get("values").get("select_request_to_review")
+                )
+                status_type_selected = (
+                    loads.get("state").get("values").get("select_status_type")
+                )
+                if request_to_review.get("select_request_to_review").get(
+                    "selected_option"
+                ).get("text").get("text") and status_type_selected.get(
+                    "select_status_type"
+                ).get(
+                    "selected_option"
+                ):
+                    HANGING_INPUT_FIELD = False
+                    selected_request_id = (
+                        (
+                            request_to_review.get("select_request_to_review")
+                            .get("selected_option")
+                            .get("text")
+                            .get("text")
+                        )
+                        .split(": ")[1]
+                        .split(" ")[0]
+                    )
+                    selected_status_type = (
+                        status_type_selected.get("select_status_type")
+                        .get("selected_option")
+                        .get("text")
+                        .get("text")
+                    )
+                    request = BonusRequest.objects.get(id=int(selected_request_id))
+                    request.status = selected_status_type
+                    request.save()
+                    bot_message = BotMessage(channel=channel_id, username=username)
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Status updated successfully*"
+                        )
+                    )
+                    return Response(status=status.HTTP_200_OK)
+                else:
+                    HANGING_INPUT_FIELD = True
+                    return Response(status=status.HTTP_200_OK)
         return Response(status=status.HTTP_200_OK)
 
 
@@ -292,13 +364,22 @@ class RegisterUserCommandView(APIView):
     """
 
     def post(self, request):
-        # query db and check if user has slack id, respond with denied if true, respond registered if false
+        # query db and check if user has slack id
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
+        user = LannisterUser.objects.get(username=username)
         bot_message = BotMessage(channel, username)
-        slack_client.chat_postMessage(**bot_message.register_response_markdown())
-        return Response(status=status.HTTP_200_OK)
+        if user.slack_user_id:
+            slack_client.chat_postMessage(
+                **bot_message.base_styled_message("*You've already been registered*")
+            )
+            return Response(status=status.HTTP_200_OK)
+        # kwargs basically returns {channel_id: <id>, username: <username>, bots_picture: <some_emoji>, blocks: [some_slack_styling_blocks] if provided}
+        # instead of manually typing it out all the time
+        else:
+            slack_client.chat_postMessage(**bot_message.register())
+            return Response(status=status.HTTP_200_OK)
 
 
 class ChooseActionCommandView(APIView):
@@ -315,7 +396,7 @@ class ChooseActionCommandView(APIView):
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
         bot_message = BotMessage(channel=channel, username=username)
-        slack_client.chat_postMessage(**bot_message.actions_response_markdown())
+        slack_client.chat_postMessage(**bot_message.list_actions())
         return Response(status=status.HTTP_200_OK)
 
 
@@ -339,7 +420,7 @@ class ListRequestsCommandView(APIView):
         bot_message = BotMessage(
             channel=channel, username=username, collection=bonus_requests
         )
-        slack_client.chat_postMessage(**bot_message.list_requests_response_markdown())
+        slack_client.chat_postMessage(**bot_message.list_requests())
         return Response(status=status.HTTP_200_OK)
 
 
@@ -353,7 +434,8 @@ class NewRequestCommandView(APIView):
         modal_message = ModalMessage(channel, username)
         # modal_message.modal_on_new_bonus_request()
         slack_client.views_open(
-            trigger_id=trigger_id, view=modal_message.modal_on_new_bonus_request()
+            trigger_id=trigger_id,
+            view=modal_message.modal_on_new_bonus_request(channel_id=channel),
         )
         return Response(status=status.HTTP_200_OK)
 
@@ -382,12 +464,9 @@ class ReviewRequestCommandView(APIView):
         if reviewer_role in reviewer.roles.all():
             # do the logic
             message = MessageWithDropdowns(channel, username)
-
+            bonus_statuses = get_all_bonus_request_statuses()
+            print(bonus_statuses)
             slack_client.chat_postMessage(**message.review_request_dropdown())
-            slack_client.chat_postMessage(
-                channel=channel,
-                text="Modal should pop up here with the details. #TODO",
-            )
             return Response(status=status.HTTP_200_OK)
 
         else:
@@ -417,7 +496,7 @@ class AddReviewerCommandView(APIView):
                 queryset=bonus_request,
             )
 
-            slack_client.chat_postMessage(**reviewers_list.show_active_requests())
+            slack_client.chat_postMessage(**reviewers_list.assign_reviewer())
             return Response(status=status.HTTP_200_OK)
 
 
