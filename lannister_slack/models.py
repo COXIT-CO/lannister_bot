@@ -45,7 +45,7 @@ class BonusRequest(models.Model):
                     )
                 )
             self.reviewer = reviewer
-        except AttributeError:
+        except (AttributeError, ValueError):
             # if reviewer is null
             pass
         finally:
