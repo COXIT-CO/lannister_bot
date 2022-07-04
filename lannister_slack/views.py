@@ -1,5 +1,4 @@
 import json
-import re
 from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -92,46 +91,80 @@ class InteractivesHandler(APIView):
                 Might be helpful if you have dozen of input fields.
             """
 
-            aquired_from_modal_messages = list(
+            acquired_from_modal_messages = list(
                 loads.get("view").get("state").get("values").values()
             )
-            print(prettify_json(aquired_from_modal_messages))
             if (
-                list(aquired_from_modal_messages[0].keys())[0]
+                list(acquired_from_modal_messages[0].keys())[0]
                 == "new_bonus_request_modal_type"
             ):
-                selected_bonus_type = aquired_from_modal_messages[0][
+                selected_bonus_type = acquired_from_modal_messages[0][
                     "new_bonus_request_modal_type"
                 ]["selected_option"]["text"]["text"]
-                provided_description = aquired_from_modal_messages[1][
+                provided_description = acquired_from_modal_messages[1][
                     "new_bonus_request_modal_description"
                 ]["value"]
-                provided_pay_date_str = aquired_from_modal_messages[2][
+                provided_reviewer = acquired_from_modal_messages[2][
+                    "new_bonus_request_selected_reviewer"
+                ]["selected_option"]["text"]["text"]
+                provided_pay_date_str = acquired_from_modal_messages[3][
                     "datepicker-action"
                 ]["selected_date"]
                 provided_pay_date_datetime = datetime.strptime(
                     provided_pay_date_str, "%Y-%m-%d"
                 )
                 print(f"datetime: {provided_pay_date_datetime}")
-                # bonus_type = BonusRequest.objects.filter(
-                #     bonus_type=selected_bonus_type
-                # ).exists()
                 user = LannisterUser.objects.get(username=username)
+                reviewer = LannisterUser.objects.get(username=provided_reviewer)
                 new_bonus_request = BonusRequest.objects.create(
                     creator=user,
+                    reviewer=reviewer,
                     bonus_type=selected_bonus_type,
                     description=provided_description,
                     payment_date=provided_pay_date_datetime,
                 )
                 new_bonus_request.save()
-                # print("saved")
+                print("saved")
                 # channel id is not available in interactions with modal idk why, TODO: find some workaround to send message to the user that something actually happened
                 # response_msg = BotMessage(channel="D03MK2ADT29", username=username)
                 # slack_client.chat_postMessage()
                 return Response(status=status.HTTP_200_OK)
 
+            if (
+                list(acquired_from_modal_messages[0].keys())[0]
+                == "edit_request_bonus_type_selected"
+            ):
+                # get id from the title
+                request_id = loads.get("view").get("title").get("text").split("#")[-1]
+                # print(request_id)
+                values = loads.get("view").get("state").get("values")
+                bonus_type = (
+                    values.get("edit_request_bonus_type_selected")
+                    .get("edit_request_bonus_type_selected")
+                    .get("selected_option")
+                    .get("text")
+                    .get("text")
+                )
+                description = (
+                    values.get("edit_request_description_from_modal")
+                    .get("edit_request_description_from_modal")
+                    .get("value")
+                )
+                bonus_request = BonusRequest.objects.get(id=request_id)
+
+                # might not trigger a model signal, beware
+                bonus_request.__class__.objects.update(
+                    bonus_type=bonus_type, description=description
+                )
+                channel_id = (
+                    loads.get("view").get("blocks")[0].get("block_id")
+                )  # see comment in utils.py modal_on_bonus_request_edit() method
+                slack_client.chat_postMessage(
+                    channel=channel_id, text="Updated successfully"
+                )
+                return Response(status=status.HTTP_200_OK)
             # find all the fields that were sent from modal element
-            message_values = [item.values() for item in aquired_from_modal_messages]
+            message_values = [item.values() for item in acquired_from_modal_messages]
             messages_from_modal = [item[0].get("value") for item in message_values]
             print(messages_from_modal)
 
@@ -183,10 +216,13 @@ class InteractivesHandler(APIView):
 
             if action_id == "edit_request":
                 selected_request = (
-                    loads.get("state")[0].get("selected_option").get("text").get("text")
+                    loads.get("actions")[0]
+                    .get("selected_option")
+                    .get("text")
+                    .get("text")
                 )
                 # parse string for bonus request id, change the way of parsing id when output in dropdown element is changed
-                find_request_id = re.findall(r"\s[0-9]\s", selected_request)[0].strip()
+                find_request_id = selected_request.split(": ")[1].split(" ")[0]
                 print(find_request_id)
                 bonus_request_from_dropdown = BonusRequest.objects.get(
                     id=int(find_request_id)
@@ -197,7 +233,8 @@ class InteractivesHandler(APIView):
                 modal = ModalMessage(channel_id, username)
                 slack_client.views_open(
                     trigger_id=loads.get("trigger_id"),
-                    view=modal.modal_on_bonus_request_edit(),
+                    view=modal.modal_on_bonus_request_edit(request_id=find_request_id),
+                    channel_id=channel_id,
                 )
                 return Response(status=status.HTTP_200_OK)
 
