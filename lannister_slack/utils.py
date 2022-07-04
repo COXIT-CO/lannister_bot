@@ -3,10 +3,13 @@ import json
 from datetime import datetime
 
 from lannister_auth.models import LannisterUser
-from lannister_auth.serializers import RoleSerializer, UserSerializer
+from lannister_auth.serializers import UserSerializer
 
-from lannister_slack.models import BonusRequest
-from lannister_slack.serializers import BonusRequestSerializer
+from lannister_slack.models import BonusRequest, BonusRequestStatus
+from lannister_slack.serializers import (
+    BonusRequestSerializer,
+    BonusRequestStatusSerializer,
+)
 
 
 def prettify_json(data):
@@ -41,8 +44,12 @@ def get_all_bonus_types():
 
 
 def get_all_bonus_request_statuses():
-    status_choises = BonusRequest.status.field.choices
-    statuses = set(choice[0] for choice in status_choises[::-1])
+    status_choises = BonusRequestStatus.objects.all()
+    statuses = [
+        BonusRequestStatusSerializer(choice).data["status_name"]
+        for choice in status_choises
+    ]
+    print(statuses)
     return statuses
 
 
@@ -112,6 +119,7 @@ class BotMessage:
                 "type": "plain_text_input",
                 "multiline": False,
                 # "optional": True
+                "action_id": "plain_text_input-action",
             },
         }
         self.accessory = {
@@ -207,6 +215,7 @@ class BotMessage:
         serialized_collection = [
             BonusRequestSerializer(item).data for item in self.collection
         ]
+        print(serialized_collection)
         if len(serialized_collection) == 0:
             self.body["text"][
                 "text"
@@ -218,7 +227,7 @@ class BotMessage:
         for collection in serialized_collection:
             construct_text_response = list_requests_message_constructor(collection)
             requests_list.append(construct_text_response)
-        print(requests_list)
+        # print(requests_list)
         # self.body["text"]["text"] = f"{''.join(item for item in requests_list)}"
         self.button["block_id"] = "update_request_from_list"
         self.button["elements"][0]["action_id"] = "update_request_from_list"
@@ -387,11 +396,15 @@ class ModalMessage(BotMessage):
             reviewer_options.append(option)
         reviewers_dropdown["block_id"] = "reviewers_dropdown_input"
         reviewers_dropdown["element"]["options"] = reviewer_options
+        self.input["label"]["text"] = "Amount of reward you'd want in USD"
+        self.input["block_id"] = "usd_amount"
+        self.input["element"]["action_id"] = "usd_amount"
         self.response["blocks"] = [
             divider_with_channel_id,
             bonus_type_dropdown,
             self.multiline_plain_text_input,
             reviewers_dropdown,
+            self.input,
             self.datepicker,
         ]
         print(prettify_json(self.response))
@@ -417,7 +430,6 @@ class MessageWithDropdowns(BotMessage):
         for bonus_request in self.queryset:
             serialized_request = BonusRequestSerializer(bonus_request).data
             serialized_requests.append(serialized_request)
-
         for index, request in enumerate(serialized_requests):
             option = copy.deepcopy(self.option)
             option["text"][
@@ -443,14 +455,13 @@ class MessageWithDropdowns(BotMessage):
         accessory_reviewers = copy.deepcopy(self.accessory)
         accessory_reviewers["action_id"] = "select_reviewer"
         accessory_reviewers["placeholder"]["text"] = "Enter reviewer's name"
-        serialized_reviewers = RoleSerializer(self.collection).data
+        reviewers = get_all_reviewers()
         options_reviewers = []
-        for index, item in enumerate(serialized_reviewers.get("users")):
+        for index, item in enumerate(reviewers):
             option = copy.deepcopy(self.option)
             option["text"]["text"] = f"{item['username']}"
             option["value"] = f"value-{index}"
             options_reviewers.append(option)
-
         accessory_reviewers["options"] = options_reviewers
         reviewer_section = copy.deepcopy(self.body)
         reviewer_section["block_id"] = "reviewer"
@@ -515,7 +526,9 @@ class MessageWithDropdowns(BotMessage):
         self.body["text"]["text"] = "Select request to review"
         requests_selection = copy.deepcopy(self.accessory)
         requests_selection["action_id"] = "select_request_to_review"
-        not_reviewed_requests_qs = BonusRequest.objects.filter(status="Created")
+        not_reviewed_requests_qs = BonusRequest.objects.filter(
+            status__status_name="Created"
+        )
         not_reviewed_requests = [
             BonusRequestSerializer(item).data for item in not_reviewed_requests_qs
         ]
