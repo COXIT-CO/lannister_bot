@@ -1,9 +1,12 @@
-import json
 import copy
+import json
+from datetime import datetime
+
 from lannister_auth.models import LannisterUser
+from lannister_auth.serializers import RoleSerializer, UserSerializer
+
 from lannister_slack.models import BonusRequest
 from lannister_slack.serializers import BonusRequestSerializer
-from lannister_auth.serializers import RoleSerializer, UserSerializer
 
 
 def prettify_json(data):
@@ -13,6 +16,28 @@ def prettify_json(data):
     Refactor to helpers/utils file later
     """
     return json.dumps(data, indent=4)
+
+
+def list_requests_message_constructor(collection):
+    return f"*Request id: {collection['id']}*\n \
+*Status: {collection['status']}*\n \
+*Reviewer: {collection.get('reviewer').get('username') if collection.get('reviewer') else 'Unassigned'}*\n \
+- Request description: {collection['description']}\n \
+- Request created at: {collection['created_at']}\n \
+- Request last updated at: {collection['updated_at']}\n \
+- Payment date: {collection['payment_date']}\n"
+
+
+def get_all_reviewers():
+    reviewers_qs = LannisterUser.objects.filter(roles__in=[2])
+    reviewers = [UserSerializer(reviewer).data for reviewer in reviewers_qs]
+    return reviewers
+
+
+def get_all_bonus_types():
+    bonus_requests = BonusRequest.bonus_type.field.choices  # returns list of tuples
+    bonus_types = set([choice[0] for choice in bonus_requests])
+    return bonus_types
 
 
 # def convert_date_to_readable_eu_format(date):
@@ -99,14 +124,20 @@ class BotMessage:
         }
         self.dropdown_in_modal = {
             "type": "input",
+            "block_id": None,
             "label": {
                 "type": "plain_text",
                 "text": None,
             },
-            "element": {"type": "static_select", "options": []},
+            "element": {
+                "type": "static_select",
+                "options": [],
+                "action_id": None,
+            },
         }
         self.multiline_plain_text_input = {
             "type": "input",
+            "block_id": None,
             "element": {
                 "type": "plain_text_input",
                 "multiline": True,
@@ -154,24 +185,23 @@ class BotMessage:
         return self.response
 
     def list_requests_response_markdown(self):
-        self.header["text"]["text"] = "*List of requests*"
+        self.header["text"]["text"] = f"List of bonus requests by {self.username}"
         serialized_collection = [
             BonusRequestSerializer(item).data for item in self.collection
         ]
-
+        if len(serialized_collection) == 0:
+            self.body["text"][
+                "text"
+            ] = "You haven't submitted any requests.\n*Hint*: /new-request"
+            self.response["blocks"] = [self.header, self.divider, self.body]
+            return self.response
         # create and construct string from Queryset passed as self.collection
-        response_text = []
+        requests_list = []
         for collection in serialized_collection:
-            construct_text_response = f"*Request id: {collection['id']}*\n \
-*Status: {collection['status']}*\n \
-*Reviewer: {collection['reviewer']['username']}*\n \
-- Request description: {collection['description']}\n \
-- Request created at: {collection['created_at']}\n \
-- Request last updated at: {collection['updated_at']}\n \
-- Payment date: {collection['payment_date']}\n"
-            response_text.append(construct_text_response)
-
-        self.body["text"]["text"] = f"{''.join(item for item in response_text)}"
+            construct_text_response = list_requests_message_constructor(collection)
+            requests_list.append(construct_text_response)
+        print(requests_list)
+        # self.body["text"]["text"] = f"{''.join(item for item in requests_list)}"
         self.button["block_id"] = "update_request_from_list"
         self.button["elements"][0]["action_id"] = "update_request_from_list"
         self.button["elements"][0]["text"]["text"] = "Update request"
@@ -179,9 +209,14 @@ class BotMessage:
             self.divider,
             self.header,
             self.divider,
-            self.body,
-            self.button,
         ]
+        for request in requests_list:
+            unique_request = copy.deepcopy(self.body)
+            unique_request["text"]["text"] = request
+            self.response["blocks"].append(unique_request)
+            self.response["blocks"].append(self.divider)
+
+        self.response["blocks"].append(self.button)
         print(prettify_json(self.response))
         return self.response
 
@@ -219,12 +254,6 @@ class BotMessage:
             self.response["blocks"].append(users_data)
         print(prettify_json(self.response))
         return self.response
-
-    # def edit_request_response_markdown(self):
-    #     serialize_bonus_request = BonusRequestSerializer(self.collection).data
-    #     self.body["text"]["text"] = f"*{prettify_json(serialize_bonus_request)}*"
-    #     self.response["blocks"] = [self.divider, self.body, self.divider]
-    #     return self.response
 
 
 class ModalMessage(BotMessage):
@@ -277,40 +306,82 @@ class ModalMessage(BotMessage):
         print(f"modal: {prettify_json(self.response)}")
         return self.response
 
-    def modal_on_bonus_request_edit(self):
-        self.input["label"]["text"] = "Placeholder"
-        self.response["title"]["text"] = "Edit bonus request"
-        self.response["blocks"] = [
-            self.divider,
-            self.input,
-            self.divider,
-            self.input,
-        ]
-        print(prettify_json(self.response))
-        return self.response
+    def modal_on_bonus_request_edit(self, request_id=None):
+        divider_with_channel_id = copy.deepcopy(
+            self.divider
+        )  # very dangerous workaround to find channel id in triggered modal, rework if possible
+        divider_with_channel_id["block_id"] = self.channel
+        bonus_types = get_all_bonus_types()
+        self.dropdown_in_modal["label"]["text"] = "Edit bonus type"
+        self.dropdown_in_modal["element"][
+            "action_id"
+        ] = "edit_request_bonus_type_selected"
+        self.dropdown_in_modal["block_id"] = "edit_request_bonus_type_selected"
 
-    def modal_on_new_bonus_request(self):
-        self.response["title"]["text"] = "New bonus request"
-        bonus_requests = BonusRequest.objects.all()
-        bonus_types = set([item.bonus_type for item in bonus_requests])
         options = []
         for index, bonus_type in enumerate(bonus_types):
             option = copy.deepcopy(self.option)
             option["text"]["text"] = bonus_type
             option["value"] = f"value-{index}"
             options.append(option)
-        self.dropdown_in_modal["label"]["text"] = "Select bonus type"
         self.dropdown_in_modal["element"]["options"] = options
-        self.dropdown_in_modal["element"]["action_id"] = "new_bonus_request_modal_type"
+        self.multiline_plain_text_input[
+            "block_id"
+        ] = "edit_request_description_from_modal"
+        self.multiline_plain_text_input["label"]["text"] = "Change description"
+        self.multiline_plain_text_input["element"][
+            "action_id"
+        ] = "edit_request_description_from_modal"
+        self.response["title"]["text"] = f"Edit bonus request #{request_id}"
+        self.response["blocks"] = [
+            divider_with_channel_id,
+            self.dropdown_in_modal,
+            self.divider,
+            self.multiline_plain_text_input,
+        ]
+        print(prettify_json(self.response))
+        return self.response
+
+    def modal_on_new_bonus_request(self):
+        self.response["title"]["text"] = "New bonus request"
+        reviewer_dropdown = copy.deepcopy(self.dropdown_in_modal)
+        bonus_requests = BonusRequest.bonus_type.field.choices  # returns list of tuples
+        bonus_types = set([choice[0] for choice in bonus_requests])
+        options = []
+        for index, bonus_type in enumerate(bonus_types):
+            option = copy.deepcopy(self.option)
+            option["text"]["text"] = bonus_type
+            option["value"] = f"value-{index}"
+            options.append(option)
+        bonus_type_dropdown = copy.deepcopy(self.dropdown_in_modal)
+        bonus_type_dropdown["label"]["text"] = "Select bonus type"
+        bonus_type_dropdown["element"]["options"] = options
+        bonus_type_dropdown["element"]["action_id"] = "new_bonus_request_modal_type"
         self.multiline_plain_text_input["element"][
             "action_id"
         ] = "new_bonus_request_modal_description"
         self.multiline_plain_text_input["label"]["text"] = "Add a description"
         self.datepicker["label"]["text"] = "Pick a payment date"
+        self.datepicker["element"]["initial_date"] = datetime.today().strftime(
+            "%Y-%m-%d"
+        )
+        reviewers = get_all_reviewers()
+        reviewer_dropdown["label"]["text"] = "Select a reviewer"
+        reviewer_dropdown["element"][
+            "action_id"
+        ] = "new_bonus_request_selected_reviewer"
+        reviewer_options = []
+        for index, reviewer in enumerate(reviewers):
+            option = copy.deepcopy(self.option)
+            option["text"]["text"] = f"{reviewer.get('username')}"
+            option["value"] = f"value-{index}"
+            reviewer_options.append(option)
+        reviewer_dropdown["element"]["options"] = reviewer_options
         self.response["blocks"] = [
             self.divider,
-            self.dropdown_in_modal,
+            bonus_type_dropdown,
             self.multiline_plain_text_input,
+            reviewer_dropdown,
             self.datepicker,
         ]
         # add reviewer input
