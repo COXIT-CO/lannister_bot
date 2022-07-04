@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from lannister_auth.models import LannisterUser, Role
 
@@ -9,21 +11,19 @@ NOTE: following models/managers are used for building out the skeleton
 
 
 class BonusRequest(models.Model):
-    class BonusRequestStatus(models.TextChoices):
-        CREATED = "Created", _("Created")
-        APPROVED = "Approved", _("Approved")
-        REJECTED = "Rejected", _("Rejected")
-        DONE = "Done", _("Done")
+    # class BonusRequestStatus(models.TextChoices):
+    #     CREATED = "Cr", _("Created")
+    #     APPROVED = "Appr", _("Approved")
+    #     REJECTED = "Rj", _("Rejected")
+    #     DONE = "Done", _("Done")
 
     class BonusRequestType(models.TextChoices):
         REFERAL = "Referral", _("Referral")
         OVERTIME = "Overtime", _("Overtime")
 
     creator = models.ForeignKey(LannisterUser, on_delete=models.PROTECT)
-    status = models.CharField(
-        max_length=50,
-        choices=BonusRequestStatus.choices,
-        default=BonusRequestStatus.CREATED,
+    status = models.ForeignKey(
+        "BonusRequestStatus", related_name="statuses", on_delete=models.CASCADE
     )
     reviewer = models.ForeignKey(
         LannisterUser, related_name="reviewer", on_delete=models.SET_NULL, null=True
@@ -32,7 +32,8 @@ class BonusRequest(models.Model):
     description = models.CharField(max_length=255, blank=False)
     created_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now_add=True)
-    payment_date = models.DateField(null=True)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=3)
+    payment_date = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
         try:
@@ -56,3 +57,36 @@ class BonusRequest(models.Model):
 
 
 # TODO: implement history
+class BonusRequestsHistory(models.Model):
+    bonus_request = models.ForeignKey(
+        BonusRequest, related_name="requests", on_delete=models.PROTECT
+    )
+
+    def __str__(self):
+        return f"Request id: {self.bonus_request.pk}, opened by {self.bonus_request.creator}"
+
+    class Meta:
+        verbose_name_plural = "Bonus requests history"
+
+
+class BonusRequestStatus(models.Model):
+    status_name = models.CharField(max_length=45, unique=True, null=False)
+
+    def __str__(self):
+        return self.status_name
+
+    class Meta:
+        verbose_name = "Bonus status"
+        verbose_name_plural = "Bonus statuses"
+
+
+def create_history(sender, instance, created, *args, **kwargs):
+    if created:
+        BonusRequestsHistory.objects.get_or_create(bonus_request=instance)
+
+
+@receiver(post_save, sender=BonusRequest)
+def add_status_change_to_history(sender, instance, *args, **kwargs):
+    previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
+    if not previous or previous.bonus_request.status != instance.bonus_request.status:
+        BonusRequestsHistory.objects.create(bonus_request=instance)
