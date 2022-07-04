@@ -10,10 +10,20 @@ NOTE: following models/managers are used for building out the skeleton
 """
 
 
+class BonusRequestStatus(models.Model):
+    status_name = models.CharField(max_length=45, unique=True, null=False)
+
+    def __str__(self):
+        return self.status_name
+
+    class Meta:
+        # db_table = "bonus_requests_status"
+        verbose_name = "Bonus status"
+        verbose_name_plural = "Bonus statuses"
 
 def get_default_request_status():
     """ get a default value for request status; create new status if not available """
-    return BonusRequestStatus.objects.get_or_create(name="created")[0]
+    return BonusRequestStatus.objects.get_or_create(status_name="Created")[0]
 
 class BonusRequest(models.Model):
     # class BonusRequestStatus(models.TextChoices):
@@ -28,8 +38,8 @@ class BonusRequest(models.Model):
 
     creator = models.ForeignKey(LannisterUser, on_delete=models.PROTECT)
     status = models.ForeignKey(
-        "BonusRequestStatus", related_name="statuses", on_delete=models.CASCADE,
-        defauld=get_default_request_status()
+        "BonusRequestStatus", related_name="statuses", default=get_default_request_status,
+        on_delete=models.CASCADE
     )
     reviewer = models.ForeignKey(
         LannisterUser, related_name="reviewer", on_delete=models.SET_NULL, null=True
@@ -53,12 +63,11 @@ class BonusRequest(models.Model):
         self.reviewer = reviewer
         super().save(*args, **kwargs)
 
-
     def __str__(self):
         return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
 
-    class Meta:
-        db_table = "bonus_requests"
+    # class Meta:
+    #     db_table = "bonus_requests"
 
 
 # TODO: implement history
@@ -67,39 +76,37 @@ class BonusRequest(models.Model):
 TODO: Refactor request history
 """
 class BonusRequestsHistory(models.Model):
+
     bonus_request = models.ForeignKey(
-        BonusRequest, related_name="requests", on_delete=models.PROTECT
+        BonusRequest, related_name="history_requests", on_delete=models.CASCADE
     )
+    status = models.ForeignKey(
+        BonusRequestStatus, related_name="history_statuses", on_delete=models.CASCADE, null=True
+    )
+    date = models.DateTimeField(null=True)
 
     def __str__(self):
         return f"Request id: {self.bonus_request.pk}, opened by {self.bonus_request.creator}"
 
     class Meta:
-        db_table = "bonus_requests_history"
+        # db_table = "bonus_requests_history"
         verbose_name_plural = "Bonus requests history"
-
-
-class BonusRequestStatus(models.Model):
-    status_name = models.CharField(max_length=45, unique=True, null=False)
-
-    def __str__(self):
-        return self.status_name
-
-    class Meta:
-        db_table = "bonus_requests_status"
-        verbose_name = "Bonus status"
-        verbose_name_plural = "Bonus statuses"
 
 """
 TODO: Refactor history creating
 """
-def create_history(sender, instance, created, *args, **kwargs):
-    if created:
-        BonusRequestsHistory.objects.get_or_create(bonus_request=instance)
+# def create_history(sender, instance, created, *args, **kwargs):
+#     if created:
+#         BonusRequestsHistory.objects.get_or_create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+#
+#
+# @receiver(post_save, sender=BonusRequest)
+# def add_status_change_to_history(sender, instance, *args, **kwargs):
+#     previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
+#     if not previous or previous.bonus_request.status != instance.status:
+#         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
 
 
 @receiver(post_save, sender=BonusRequest)
-def add_status_change_to_history(sender, instance, *args, **kwargs):
-    previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
-    if not previous or previous.bonus_request.status != instance.bonus_request.status:
-        BonusRequestsHistory.objects.create(bonus_request=instance)
+def add_status_to_history(sender, instance, *args, **kwargs):
+    BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
