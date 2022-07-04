@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
-from lannister_slack.models import BonusRequest
+from lannister_slack.models import BonusRequest, BonusRequestStatus
 from lannister_slack.serializers import BonusRequestSerializer
 from lannister_slack.utils import (
     prettify_json,
@@ -16,6 +16,7 @@ from lannister_slack.utils import (
     get_all_bonus_request_statuses,
 )
 from lannister_auth.models import LannisterUser, Role
+from slack_sdk.errors import SlackApiError
 
 
 @api_view(["POST"])
@@ -30,13 +31,19 @@ BOT_ID = slack_client.api_call("auth.test")["user_id"]
 # flag to check if user filled all required input fields (if there is multiple of them) before sending new command
 HANGING_INPUT_FIELD = False
 
+"""
+TODO: add HANGING_INPUT_FIELD check to all of the views, add /history handler
+"""
+
 
 def notify_user_about_hanging_field(channel, username=None):
     """
     Helper function to tell chat user that he didn't fill previous command/fields/forms/modals etc.
     """
     text = f"YOYOYOYOYO, {username}, chill, fill the fields from previous command\nData wasn't changed. Continue with new command or fill out missing stuff"
-    slack_client.chat_postMessage(channel=channel, text=text)
+    # slack_client.chat_postMessage(channel=channel, text=text)
+    bot_message = BotMessage(channel, username)
+    slack_client.chat_postMessage(**bot_message.base_styled_message(f"{text}"))
     return Response(status=status.HTTP_403_FORBIDDEN)
 
 
@@ -107,7 +114,8 @@ class InteractivesHandler(APIView):
                 provided_reviewer = acquired_from_modal_messages[2][
                     "new_bonus_request_selected_reviewer"
                 ]["selected_option"]["text"]["text"]
-                provided_pay_date_str = acquired_from_modal_messages[3][
+                provided_amount = acquired_from_modal_messages[3]["usd_amount"]["value"]
+                provided_pay_date_str = acquired_from_modal_messages[4][
                     "datepicker-action"
                 ]["selected_date"]
                 provided_pay_date_datetime = datetime.strptime(
@@ -115,12 +123,17 @@ class InteractivesHandler(APIView):
                 )
                 user = LannisterUser.objects.get(username=username)
                 reviewer = LannisterUser.objects.get(username=provided_reviewer)
+                default_status = BonusRequestStatus.objects.filter(
+                    status_name="Created"
+                ).first()
                 new_bonus_request = BonusRequest.objects.create(
                     creator=user,
                     reviewer=reviewer,
                     bonus_type=selected_bonus_type,
                     description=provided_description,
                     payment_date=provided_pay_date_datetime,
+                    price_usd=float(provided_amount),
+                    status=default_status,
                 )
                 new_bonus_request.save()
                 channel_id = loads.get("view").get("blocks")[0].get("block_id")
@@ -174,7 +187,7 @@ class InteractivesHandler(APIView):
             messages_from_modal = [item[0].get("value") for item in message_values]
             print(messages_from_modal)
 
-            # do something with acquired messages, might want to implement other checks here before doing business logic
+            # do something with acquired messages, might want to implement other checks before doing business logic
             return Response(status=status.HTTP_200_OK)
 
         if event_type == "block_actions":
@@ -285,10 +298,6 @@ class InteractivesHandler(APIView):
                         "*Use /edit-request to edit your bonus request*"
                     )
                 )
-                # slack_client.views_open(
-                #     trigger_id=trigger_id,
-                #     view=modal.modal_on_update_request_button_click(),
-                # )
                 return Response(status=status.HTTP_200_OK)
 
             if action_id == "confirm_register":
@@ -337,7 +346,10 @@ class InteractivesHandler(APIView):
                         .get("text")
                     )
                     request = BonusRequest.objects.get(id=int(selected_request_id))
-                    request.status = selected_status_type
+                    status_obj = BonusRequestStatus.objects.get(
+                        status_name=selected_status_type
+                    )
+                    request.status = status_obj
                     request.save()
                     bot_message = BotMessage(channel=channel_id, username=username)
                     slack_client.chat_postMessage(
@@ -466,9 +478,15 @@ class ReviewRequestCommandView(APIView):
             message = MessageWithDropdowns(channel, username)
             bonus_statuses = get_all_bonus_request_statuses()
             print(bonus_statuses)
-            slack_client.chat_postMessage(**message.review_request_dropdown())
-            return Response(status=status.HTTP_200_OK)
-
+            try:
+                slack_client.chat_postMessage(**message.review_request_dropdown())
+                return Response(status=status.HTTP_200_OK)
+            except SlackApiError:
+                bot_message = BotMessage(channel=channel, username=username)
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message("*No bonus requests to review*")
+                )
+                return Response(status=status.HTTP_200_OK)
         else:
             slack_client.chat_postMessage(
                 channel=channel, text="You're not eligible to access this command"
@@ -487,12 +505,9 @@ class AddReviewerCommandView(APIView):
             return Response(status=status.HTTP_403_FORBIDDEN)
         else:
             bonus_request = BonusRequest.objects.filter(creator__username=username)
-            print(bonus_request)
-            reviewers = Role.objects.filter(users__in=[2]).first()  # ???
             reviewers_list = MessageWithDropdowns(
                 channel=channel,
                 username=username,
-                collection=reviewers,
                 queryset=bonus_request,
             )
 
