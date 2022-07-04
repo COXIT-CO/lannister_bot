@@ -90,12 +90,11 @@ def add_status_change_to_history(sender, instance, *args, **kwargs):
         BonusRequestsHistory.objects.create(bonus_request=instance)
 
 
-def create_bonus_requests_status(sender, instance, created, *args, **kwargs):
-    if created:
-        BonusRequestStatus.objects.get_or_create(status_name="Created")
-        BonusRequestStatus.objects.get_or_create(status_name="Approved")
-        BonusRequestStatus.objects.get_or_create(status_name="Rejected")
-        BonusRequestStatus.objects.get_or_create(status_name="Done")
+def create_bonus_requests_status(sender, instance, *args, **kwargs):
+    BonusRequestStatus.objects.get_or_create(status_name="Created")
+    BonusRequestStatus.objects.get_or_create(status_name="Approved")
+    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
+    BonusRequestStatus.objects.get_or_create(status_name="Done")
 
 
 pre_save.connect(create_bonus_requests_status, BonusRequest)
