@@ -3,10 +3,6 @@ from django.urls import path, include
 from rest_framework.schemas import get_schema_view
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-"""
-NOTE: following urls are used for building out the skeleton
-      and should be adjusted when LAN-53 (API endpoints) is finalized and agreed upon
-"""
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -19,7 +15,7 @@ urlpatterns = [
                 path(
                     "schema",
                     get_schema_view(
-                        title="el-shopperinjoAPI",
+                        title="lannister",
                         description="api schema",
                         version="1.0.0",
                     ),
