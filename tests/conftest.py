@@ -3,6 +3,7 @@ from mixer.backend.django import mixer
 from lannister_auth.models import LannisterUser, Role
 from lannister_slack.models import BonusRequest
 from rest_framework.test import APIClient
+from django.urls import reverse
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def worker_role():
 
 @pytest.fixture
 def admin_user(admin_role, reviewer_role, worker_role):
-    user = LannisterUser.objects.create_user(
+    user = LannisterUser.objects.create_superuser(
         username="Kabob",
         password="someverysecurepass",
         email="k@gmail.com",
@@ -64,20 +65,54 @@ def worker_user(worker_role):
     return user
 
 
-@pytest.fixture()
-def superuser():
-    return LannisterUser.objects.create_superuser(
-        email="demitest@gmail.com",
-        username="demitest",
-        first_name="kabob",
-        last_name="abdul",
-        password="hackerman",
-    )
+@pytest.fixture
+def anon_api_client():
+    client = APIClient()
+    return client
 
 
 @pytest.fixture
-def api_client():
+def admin_token(anon_api_client, admin_user):
+    url = reverse("jwt-obtain-token")
+    return anon_api_client.post(
+        url, {"username": admin_user.username, "password": "someverysecurepass"}
+    ).data.get("access")
+
+
+@pytest.fixture
+def reviewer_token(anon_api_client, reviewer_user):
+    url = reverse("jwt-obtain-token")
+    return anon_api_client.post(
+        url, {"username": reviewer_user.username, "password": "someverysecurepass"}
+    ).data.get("access")
+
+
+@pytest.fixture
+def worker_token(anon_api_client, worker_user):
+    url = reverse("jwt-obtain-token")
+    return anon_api_client.post(
+        url, {"username": worker_user.username, "password": "someverysecurepass"}
+    ).data.get("access")
+
+
+@pytest.fixture
+def api_client_admin(admin_token):
     client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
+    return client
+
+
+@pytest.fixture
+def api_client_reviewer(reviewer_token):
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {reviewer_token}")
+    return client
+
+
+@pytest.fixture
+def api_client_worker(worker_token):
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {worker_token}")
     return client
 
 
