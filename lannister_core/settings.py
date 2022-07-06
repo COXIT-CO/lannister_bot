@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "lannister_slack",
     # 3rd party
     "rest_framework",
+    "djoser",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -128,4 +130,10 @@ STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-REST_FRAMEWORK = {"DATETIME_FORMAT": "%d-%m-%Y %H:%M %Z"}
+REST_FRAMEWORK = {
+    "DATETIME_FORMAT": "%d-%m-%Y %H:%M %Z",
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
