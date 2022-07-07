@@ -1,8 +1,8 @@
-from rest_framework.viewsets import ModelViewSet
-from lannister_requests.models import BonusRequest
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from lannister_requests.models import BonusRequest, BonusRequestStatus
 # from lannister_slack.serializers import BonusRequestSerializer
 from lannister_requests.serializers import BonusRequestAdminSerializer, BonusRequestRewieverSerializer, \
-    BonusRequestBaseSerializer, FullHistorySerializer
+    BonusRequestBaseSerializer, FullHistorySerializer, BonusRequestStatusSerializer
 from rest_framework.permissions import IsAuthenticated
 from lannister_requests.permissions import IsUser
 
@@ -39,7 +39,7 @@ class BonusRequestViewSet(ModelViewSet):
 
 
 
-class HistoryRequestViewSet(ModelViewSet):
+class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
     """When get model of Roles implement permissions"""
     permission_classes = (IsAuthenticated,)
