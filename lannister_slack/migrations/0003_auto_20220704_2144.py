@@ -38,7 +38,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='bonusrequest',
             name='status',
-            field=models.ForeignKey(default=lannister_slack.models.get_default_request_status, on_delete=django.db.models.deletion.CASCADE, related_name='statuses', to='lannister_slack.bonusrequeststatus'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='statuses', to='lannister_slack.bonusrequeststatus'),
         ),
         migrations.AlterField(
             model_name='bonusrequest',
