@@ -205,7 +205,12 @@ class BotMessage:
         print(prettify_json(self.response))
         return self.response
 
-    def list_actions(self):
+    def list_actions_non_admin(self):
+        self.body["text"]["text"] = "*Available commands: /list-users, /list-requests*"
+        self.response["blocks"] = [self.divider, self.body, self.divider]
+        return self.response
+
+    def list_actions_admin(self):
         self.body["text"]["text"] = "*Available commands: /new-request, /list-requests*"
         self.response["blocks"] = [self.divider, self.body, self.divider]
         return self.response
