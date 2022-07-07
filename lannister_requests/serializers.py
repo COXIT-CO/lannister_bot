@@ -1,5 +1,5 @@
 from rest_framework.serializers import ModelSerializer
-from lannister_requests.models import BonusRequest, BonusRequestsHistory
+from lannister_requests.models import BonusRequest, BonusRequestsHistory, BonusRequestStatus
 
 #
 # class BonusRequestSerializer(ModelSerializer):
@@ -41,3 +41,8 @@ class FullHistorySerializer(ModelSerializer):
     class Meta:
         model = BonusRequest
         fields = ['id', 'creator', 'reviewer', 'bonus_type', 'price_usd', 'payment_date', 'history_requests']
+
+class BonusRequestStatusSerializer(ModelSerializer):
+    class Meta:
+        model = BonusRequestStatus
+        fields = "__all__"
