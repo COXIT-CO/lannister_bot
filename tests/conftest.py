@@ -34,6 +34,7 @@ def admin_user(admin_role, reviewer_role, worker_role):
         email="k@gmail.com",
         first_name="Abdul",
         last_name="who",
+        slack_user_id="wasdaqwe",
     )
     user.roles.add(admin_role, reviewer_role, worker_role)
     return user
@@ -47,6 +48,7 @@ def reviewer_user(reviewer_role, worker_role):
         email="p@gmail.com",
         first_name="gleb",
         last_name="namedpleb",
+        slack_user_id="wasdaqwe",
     )
     user.roles.add(reviewer_role, worker_role)
     return user
@@ -54,6 +56,20 @@ def reviewer_user(reviewer_role, worker_role):
 
 @pytest.fixture()
 def worker_user(worker_role):
+    user = LannisterUser.objects.create_user(
+        username="stinker",
+        password="someverysecurepass",
+        email="s@gmail.com",
+        first_name="some",
+        last_name="idk",
+        slack_user_id="wasdaqwe",
+    )
+    user.roles.add(worker_role)
+    return user
+
+
+@pytest.fixture
+def non_workspace_member(worker_role):
     user = LannisterUser.objects.create_user(
         username="stinker",
         password="someverysecurepass",
@@ -96,6 +112,15 @@ def worker_token(anon_api_client, worker_user):
 
 
 @pytest.fixture
+def non_workspace_member_token(anon_api_client, non_workspace_member):
+    url = reverse("jwt-obtain-token")
+    return anon_api_client.post(
+        url,
+        {"username": non_workspace_member.username, "password": "someverysecurepass"},
+    ).data.get("access")
+
+
+@pytest.fixture
 def api_client_admin(admin_token):
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_token}")
@@ -113,6 +138,13 @@ def api_client_reviewer(reviewer_token):
 def api_client_worker(worker_token):
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {worker_token}")
+    return client
+
+
+@pytest.fixture
+def api_client_not_registered_in_workspace(non_workspace_member_token):
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {non_workspace_member_token}")
     return client
 
 
