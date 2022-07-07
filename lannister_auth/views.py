@@ -10,8 +10,7 @@ from django.shortcuts import get_object_or_404
 class RegisterUser(CreateAPIView):
     """
     View to allow user to register himself as worker by default.
-    TODO: add different view for admin to register reviewer through API
-    or check if jwt token was provided by the admin user => verify permission => perform register
+    Or allow admin to register user and automatically grant him 'reviwer' and 'worker' roles
     """
 
     serializer_class = UserSerializer
