@@ -114,4 +114,6 @@ TODO: Refactor history creating
 
 @receiver(post_save, sender=BonusRequest)
 def add_status_to_history(sender, instance, *args, **kwargs):
-    BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-date").first()
+    if previous.status != instance.status:
+        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
