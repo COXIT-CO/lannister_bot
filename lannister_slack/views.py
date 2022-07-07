@@ -15,7 +15,10 @@ from lannister_slack.utils import (
     MessageWithDropdowns,
     get_all_bonus_request_statuses,
 )
-from lannister_slack.permissions import IsMemberOfSlackWorkspace
+from lannister_slack.permissions import (
+    IsMemberOfSlackWorkspace,
+    IsUnregisteredMemberOfSlackWorkspace,
+)
 from lannister_auth.models import LannisterUser, Role
 from slack_sdk.errors import SlackApiError
 
@@ -376,7 +379,7 @@ class RegisterUserCommandView(APIView):
     View is used to test slack commands api
     """
 
-    permission_classes = (IsMemberOfSlackWorkspace,)
+    permission_classes = (IsUnregisteredMemberOfSlackWorkspace,)
 
     def post(self, request):
         # query db and check if user has slack id
@@ -397,7 +400,7 @@ class RegisterUserCommandView(APIView):
         else:
             slack_client.chat_postMessage(**bot_message.register())
             return Response(
-                status=status.HTTP_201_OK,
+                status=status.HTTP_201_CREATED,
             )
 
 
