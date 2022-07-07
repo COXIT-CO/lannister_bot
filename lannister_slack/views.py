@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
@@ -15,6 +15,7 @@ from lannister_slack.utils import (
     MessageWithDropdowns,
     get_all_bonus_request_statuses,
 )
+from lannister_slack.permissions import IsMemberOfSlackWorkspace
 from lannister_auth.models import LannisterUser, Role
 from slack_sdk.errors import SlackApiError
 
@@ -375,6 +376,8 @@ class RegisterUserCommandView(APIView):
     View is used to test slack commands api
     """
 
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         # query db and check if user has slack id
         print(prettify_json(request.data))
@@ -386,12 +389,16 @@ class RegisterUserCommandView(APIView):
             slack_client.chat_postMessage(
                 **bot_message.base_styled_message("*You've already been registered*")
             )
-            return Response(status=status.HTTP_200_OK)
+            return Response(
+                status=status.HTTP_200_OK,
+            )
         # kwargs basically returns {channel_id: <id>, username: <username>, bots_picture: <some_emoji>, blocks: [some_slack_styling_blocks] if provided}
         # instead of manually typing it out all the time
         else:
             slack_client.chat_postMessage(**bot_message.register())
-            return Response(status=status.HTTP_200_OK)
+            return Response(
+                status=status.HTTP_201_OK,
+            )
 
 
 class ChooseActionCommandView(APIView):
@@ -402,14 +409,25 @@ class ChooseActionCommandView(APIView):
     https://docs.google.com/presentation/d/1EqXRMvbUFbwAnEkk7jZWgyDhzom56kYO32ZZvOv8_Vw/edit#slide=id.g135a3df236f_0_49
     """
 
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         # parse user_id, grab his permissions and move from there
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
+        if request.user.is_superuser:
+            bot_message = BotMessage(channel=channel, username=username)
+            slack_client.chat_postMessage(**bot_message.list_actions_admin())
+            return Response(
+                status=status.HTTP_200_OK,
+            )
+
         bot_message = BotMessage(channel=channel, username=username)
-        slack_client.chat_postMessage(**bot_message.list_actions())
-        return Response(status=status.HTTP_200_OK)
+        slack_client.chat_postMessage(**bot_message.list_actions_non_admin())
+        return Response(
+            status=status.HTTP_200_OK,
+        )
 
 
 class ListRequestsCommandView(APIView):
