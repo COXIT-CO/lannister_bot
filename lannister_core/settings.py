@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "lannister_auth",
     "lannister_slack",
+    "lannister_requests",
     # 3rd party
     "rest_framework",
 ]
