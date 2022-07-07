@@ -9,12 +9,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import pre_save
 
 
-"""
-NOTE: following models/managers are used for building out the skeleton
-      and should be adjusted when LAN-52 (DB schema) is finalized and agreed upon
-"""
-
-
 class BaseManager(BaseUserManager):
     def get_or_none(self, **kwargs):
         try:
