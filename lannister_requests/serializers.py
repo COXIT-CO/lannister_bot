@@ -1,5 +1,5 @@
 from rest_framework.serializers import ModelSerializer
-from lannister_slack.models import BonusRequest, BonusRequestsHistory
+from lannister_requests.models import BonusRequest, BonusRequestsHistory
 
 #
 # class BonusRequestSerializer(ModelSerializer):
