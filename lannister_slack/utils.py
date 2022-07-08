@@ -23,7 +23,7 @@ def prettify_json(data):
 
 def list_requests_message_constructor(collection):
     return f"*Request id: {collection['id']}*\n \
-*Status: {collection['status']}*\n \
+*Status: {collection['status']['status_name']}*\n \
 *Reviewer: {collection.get('reviewer').get('username') if collection.get('reviewer') else 'Unassigned'}*\n \
 - Request description: {collection['description']}\n \
 - Request created at: {collection['created_at']}\n \
@@ -485,7 +485,7 @@ class MessageWithDropdowns(BotMessage):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']}"
+            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']['status_name']}"
             option["value"] = f"value-{index}"
             dropdown_choices.append(option)
         self.header["text"]["text"] = "Select bonus request to edit"
