@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
@@ -127,9 +127,7 @@ class InteractivesHandler(APIView):
                 )
                 user = LannisterUser.objects.get(username=username)
                 reviewer = LannisterUser.objects.get(username=provided_reviewer)
-                default_status = BonusRequestStatus.objects.filter(
-                    status_name="Created"
-                ).first()
+                default_status = BonusRequestStatus.objects.get(status_name="Created")
                 new_bonus_request = BonusRequest.objects.create(
                     creator=user,
                     reviewer=reviewer,
@@ -144,7 +142,7 @@ class InteractivesHandler(APIView):
                 bot_message = BotMessage(channel=channel_id, username=username)
                 slack_client.chat_postMessage(
                     **bot_message.base_styled_message(
-                        "Bonus request was registered successfully"
+                        "*Bonus request was registered successfully*"
                     )
                 )
                 return Response(status=status.HTTP_200_OK)
@@ -441,6 +439,8 @@ class ListRequestsCommandView(APIView):
     render buttons 'change status' and 'deny' or something from slack blocks example, on button change render dropdown in modal
     """
 
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(request.data)
         user_id = request.data.get("user_id", None)
@@ -458,6 +458,8 @@ class ListRequestsCommandView(APIView):
 
 
 class NewRequestCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
@@ -474,6 +476,8 @@ class NewRequestCommandView(APIView):
 
 
 class EditRequestCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
@@ -481,6 +485,14 @@ class EditRequestCommandView(APIView):
         # text = request.data.get("text", None)
         current_user = LannisterUser.objects.get(username=username)
         bonus_requests = BonusRequest.objects.filter(creator=current_user)
+        if len(bonus_requests) == 0:
+            bot_message = BotMessage(channel, username)
+            slack_client.chat_postMessage(
+                **bot_message.base_styled_message(
+                    "You haven't created any bonus requests.\n *Hint: proceed with /new-request*"
+                )
+            )
+            return Response(status=status.HTTP_200_OK)
         # print(bonus_requests)
         message = MessageWithDropdowns(channel, username, collection=bonus_requests)
         slack_client.chat_postMessage(**message.show_bonus_requests_by_user())
@@ -488,6 +500,8 @@ class EditRequestCommandView(APIView):
 
 
 class ReviewRequestCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
@@ -509,13 +523,18 @@ class ReviewRequestCommandView(APIView):
                 )
                 return Response(status=status.HTTP_200_OK)
         else:
+            bot_message = BotMessage(channel, username)
             slack_client.chat_postMessage(
-                channel=channel, text="You're not eligible to access this command"
+                **bot_message.base_styled_message(
+                    "You're not eligible to access this command"
+                )
             )
             return Response(status=status.HTTP_403_FORBIDDEN)
 
 
 class AddReviewerCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
@@ -524,19 +543,26 @@ class AddReviewerCommandView(APIView):
         if HANGING_INPUT_FIELD is True:
             notify_user_about_hanging_field(channel=channel)
             return Response(status=status.HTTP_403_FORBIDDEN)
-        else:
+        if len(LannisterUser.objects.filter(roles__in=[2])) > 0:
             bonus_request = BonusRequest.objects.filter(creator__username=username)
             reviewers_list = MessageWithDropdowns(
                 channel=channel,
                 username=username,
                 queryset=bonus_request,
             )
-
             slack_client.chat_postMessage(**reviewers_list.assign_reviewer())
             return Response(status=status.HTTP_200_OK)
 
+        bot_message = BotMessage(channel, username)
+        slack_client.chat_postMessage(
+            **bot_message.base_styled_message("*No reviewers added to lannister yet*\n")
+        )
+        return Response(status=status.HTTP_200_OK)
+
 
 class RemoveReviewerCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         channel_id = request.data.get("channel_id")
@@ -552,10 +578,14 @@ class RemoveReviewerCommandView(APIView):
 
         message = BotMessage(channel_id, username)
         slack_client.chat_postMessage(**message.access_denied())
-        return Response(status=status.HTTP_200_OK)
+        return Response(
+            status=status.HTTP_403_FORBIDDEN
+        )  # returns 200 cuz 403 will not execute bot's styled response, blame slack not me
 
 
 class ListUsersCommandView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
     def post(self, request):
         print(prettify_json(request.data))
         channel_id = request.data.get("channel_id")
@@ -569,7 +599,7 @@ class ListUsersCommandView(APIView):
             return Response(status=status.HTTP_200_OK)
 
         slack_client.chat_postMessage(**message.access_denied())
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 
 class BonusRequestViewSet(ModelViewSet):
