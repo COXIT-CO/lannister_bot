@@ -21,9 +21,9 @@ urlpatterns = [
     path("register", RegisterUserCommandView.as_view(), name="register-in-slack"),
     path("actions", ChooseActionCommandView.as_view(), name="choose-actions"),
     path("list-requests", ListRequestsCommandView.as_view(), name="list-requests"),
-    path("new-request", NewRequestCommandView.as_view(), name="new-requests"),
+    path("new-request", NewRequestCommandView.as_view(), name="new-request"),
     path("edit-request", EditRequestCommandView.as_view(), name="edit-request"),
-    path("review-request", ReviewRequestCommandView.as_view(), name="review-requests"),
+    path("review-request", ReviewRequestCommandView.as_view(), name="review-request"),
     path("add-reviewer", AddReviewerCommandView.as_view(), name="add-reviewer"),
     path(
         "remove-reviewer", RemoveReviewerCommandView.as_view(), name="remove-reviewer"
