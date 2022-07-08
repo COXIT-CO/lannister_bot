@@ -25,7 +25,7 @@ class IsMemberOfSlackWorkspace(BasePermission):
             print("from slack")
             return True
 
-        if request.user:  # can be AnonymousUser which doesn't have slack_user_id field
+        if request.user.is_authenticated:
             if request.user.slack_user_id:
                 return True
 
