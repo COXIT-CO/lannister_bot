@@ -34,9 +34,10 @@ def admin_user(admin_role, reviewer_role, worker_role):
         email="k@gmail.com",
         first_name="Abdul",
         last_name="who",
-        slack_user_id="wasdaqwe",
     )
     user.roles.add(admin_role, reviewer_role, worker_role)
+    user.slack_user_id = "wasdaqwe"
+    user.save()
     return user
 
 
