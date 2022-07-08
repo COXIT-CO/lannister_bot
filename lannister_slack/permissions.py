@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 
+
 # from lannister_auth.models import LannisterUser
 
 
@@ -9,8 +10,10 @@ class IsUnregisteredMemberOfSlackWorkspace(BaseException):
         if request_from_slack and "Slackbot 1.0" in request_from_slack:
             return True
 
-        if request.user:  # user sent jwt token with request
+        if request.user.is_authenticated:  # user sent jwt token with request
             return True
+
+        return False
 
 
 class IsMemberOfSlackWorkspace(BasePermission):
