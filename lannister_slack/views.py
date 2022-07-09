@@ -138,12 +138,21 @@ class InteractivesHandler(APIView):
                     status=default_status,
                 )
                 new_bonus_request.save()
+
                 channel_id = loads.get("view").get("blocks")[0].get("block_id")
                 bot_message = BotMessage(channel=channel_id, username=username)
                 slack_client.chat_postMessage(
                     **bot_message.base_styled_message(
                         "*Bonus request was registered successfully*"
                     )
+                )
+                bot_notification_to_reviewer = BotMessage(
+                    channel=reviewer.slack_channel_id,
+                    username=username,
+                    collection=new_bonus_request,
+                )  # NOTE: username param here is the username of the user filling out new bonus request to show his name to reviewer.
+                slack_client.chat_postMessage(
+                    **bot_notification_to_reviewer.notification_for_reviewer()
                 )
                 return Response(status=status.HTTP_200_OK)
 
@@ -194,7 +203,7 @@ class InteractivesHandler(APIView):
 
         if event_type == "block_actions":
             """
-            Handles user's choices from dropdowns
+            Handles user's choices from dropdowns/actions with clicking buttons etc.
             """
 
             action_id = loads.get("actions")[0].get(
@@ -363,6 +372,39 @@ class InteractivesHandler(APIView):
                 else:
                     HANGING_INPUT_FIELD = True
                     return Response(status=status.HTTP_200_OK)
+
+            if action_id.startswith("approve"):
+                request_id = action_id.split("_")[-1]
+                bonus_request = BonusRequest.objects.get(id=request_id)
+                status_obj = BonusRequestStatus.objects.get(status_name="Approved")
+                bonus_request.status = status_obj
+                bonus_request.save()
+                bot_message = BotMessage(
+                    channel=loads.get("channel").get("id"), username=username
+                )
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*Bonus request approved ✅ successfully*"
+                    )
+                )
+                return Response(status=status.HTTP_200_OK)
+
+            if action_id.startswith("reject"):
+                request_id = action_id.split("_")[-1]
+                bonus_request = BonusRequest.objects.get(id=request_id)
+                status_obj = BonusRequestStatus.objects.get(status_name="Approved")
+                bonus_request.status = status_obj
+                bonus_request.save()
+                bot_message = BotMessage(
+                    channel=loads.get("channel").get("id"), username=username
+                )
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*Bonus request rejected ❌ successfully*"
+                    )
+                )
+                return Response(status=status.HTTP_200_OK)
+
         return Response(status=status.HTTP_200_OK)
 
 
@@ -385,8 +427,9 @@ class RegisterUserCommandView(APIView):
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
         user = LannisterUser.objects.get(username=username)
+
         bot_message = BotMessage(channel, username)
-        if user.slack_user_id:
+        if user.slack_user_id and user.slack_channel_id:
             slack_client.chat_postMessage(
                 **bot_message.base_styled_message("*You've already been registered*")
             )
@@ -396,6 +439,8 @@ class RegisterUserCommandView(APIView):
         # kwargs basically returns {channel_id: <id>, username: <username>, bots_picture: <some_emoji>, blocks: [some_slack_styling_blocks] if provided}
         # instead of manually typing it out all the time
         else:
+            user.slack_channel_id = channel  # fishing for user's channel id to get it from elements where it's not explicitly provided
+            user.save()
             slack_client.chat_postMessage(**bot_message.register())
             return Response(
                 status=status.HTTP_201_CREATED,
