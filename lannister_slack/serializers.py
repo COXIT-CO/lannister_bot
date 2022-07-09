@@ -26,4 +26,5 @@ class BonusRequestSerializer(ModelSerializer):
             "payment_date",
             "creator",
             "reviewer",
+            "price_usd",
         ]
