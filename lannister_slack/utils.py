@@ -2,6 +2,7 @@ import copy
 import json
 from datetime import datetime
 
+
 from lannister_auth.models import LannisterUser
 from lannister_auth.serializers import UserSerializer
 
@@ -94,6 +95,11 @@ class BotMessage:
             },
         }
 
+        self.multiple_horizontal_text_elements = {"type": "section", "fields": []}
+        self.markdown_text_from_multiple_horizontal_fields = {
+            "type": "mrkdwn",
+            "text": None,
+        }
         # NOTE: buttons are interactive and
         # they're using Block kit https://api.slack.com/start/building/bolt-python#listening
 
@@ -107,6 +113,13 @@ class BotMessage:
                     "action_id": None,
                 },
             ],
+        }
+        self.multiple_horizontal_buttons = {"type": "actions", "elements": []}
+        self.singular_horizontal_button = {
+            "type": "button",
+            "text": {"type": "plain_text", "emoji": True, "text": None},
+            "style": None,
+            "value": None,
         }
         self.divider = {"type": "divider"}
         self.input = {
@@ -270,6 +283,71 @@ class BotMessage:
                 "text"
             ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*"
             self.response["blocks"].append(users_data)
+        print(prettify_json(self.response))
+        return self.response
+
+    def notification_for_reviewer(self):
+        self.header["text"]["text"] = "Hey, You! New bonus request to review"
+        serialize_bonus_request = BonusRequestSerializer(self.collection)
+        ticket_creator = self.body
+        ticket_creator["text"][
+            "text"
+        ] = f'*{serialize_bonus_request.data.get("creator").get("username")} has requested the following stuff. Approve or reject it.*'
+        ticket_status = copy.deepcopy(
+            self.markdown_text_from_multiple_horizontal_fields
+        )
+        ticket_status[
+            "text"
+        ] = f'Current status: *{serialize_bonus_request.data.get("status").get("status_name")}*'
+        bonus_type = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
+        bonus_type[
+            "text"
+        ] = f'Bonus type: *{serialize_bonus_request.data.get("bonus_type")}*'
+        requested_reward_in_usd = copy.deepcopy(
+            self.markdown_text_from_multiple_horizontal_fields
+        )
+        requested_reward_in_usd[
+            "text"
+        ] = f'Requested reward amount: ${serialize_bonus_request.data.get("price_usd")}'
+        description = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
+        description[
+            "text"
+        ] = f'Description: *{serialize_bonus_request.data.get("description")}*'
+        payment_date = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
+        payment_date[
+            "text"
+        ] = f'Requested payment date: *{serialize_bonus_request.data.get("payment_date")}*'
+
+        self.multiple_horizontal_text_elements["fields"] = [
+            ticket_status,
+            bonus_type,
+            requested_reward_in_usd,
+            description,
+            payment_date,
+        ]
+
+        approve_button = copy.deepcopy(self.singular_horizontal_button)
+        reject_button = copy.deepcopy(self.singular_horizontal_button)
+
+        approve_button["text"]["text"] = "Approve"
+        approve_button["action_id"] = f"approve_id_{self.collection.id}"
+        approve_button["style"] = "primary"
+        approve_button["value"] = "approved_request"
+        self.multiple_horizontal_buttons["elements"].append(approve_button)
+        reject_button["text"]["text"] = "Reject"
+        reject_button["action_id"] = f"reject_id_{self.collection.id}"
+        reject_button["style"] = "danger"
+        reject_button["value"] = "rejected_request"
+        self.multiple_horizontal_buttons["elements"].append(reject_button)
+        self.response["blocks"] = [
+            self.header,
+            self.divider,
+            self.body,
+            self.divider,
+            self.multiple_horizontal_text_elements,
+            self.multiple_horizontal_buttons,
+        ]
+
         print(prettify_json(self.response))
         return self.response
 
