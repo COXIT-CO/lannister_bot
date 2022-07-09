@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,7 +7,11 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
-from lannister_slack.models import BonusRequest, BonusRequestStatus
+from lannister_slack.models import (
+    BonusRequest,
+    BonusRequestStatus,
+    BonusRequestsHistory,
+)
 from lannister_slack.serializers import BonusRequestSerializer
 from lannister_slack.utils import (
     prettify_json,
@@ -405,6 +410,44 @@ class InteractivesHandler(APIView):
                 )
                 return Response(status=status.HTTP_200_OK)
 
+            if action_id.startswith("history"):
+                if len(loads.get("actions")[0]["selected_options"]) == 0:
+                    bot_message = BotMessage(channel_id, username)
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*You haven't selected anything, try agane*\nDEBUG: this multiple fields thing is clunky af"
+                        )
+                    )
+                # in this case id is in the string near '#' symbol
+                pattern = r"\s#[0-9]+\s"
+                requests = []
+                for item in loads.get("actions")[0]["selected_options"]:
+                    selected_request_id = re.findall(pattern, item["text"]["text"])[
+                        0
+                    ].strip()[1:]
+                    request = BonusRequest.objects.get(id=int(selected_request_id))
+                    requests.append(request)
+
+                # we have to either sort 'requests' array by history id, or just divide it in dict with saving current ordering
+                # key in history dict = bonus request object, value -> queryset with history of changes
+                history = {key: None for key in requests}
+                for idx, request in enumerate(requests):
+                    history_obj = BonusRequestsHistory.objects.filter(
+                        bonus_request__id=request.id
+                    )
+                    history[requests[idx]] = history_obj
+                print(history)
+                for key, value in history.items():
+                    bot_message = BotMessage(
+                        channel=channel_id,
+                        username=username,
+                        collection=key,
+                        queryset=value,
+                    )
+                    slack_client.chat_postMessage(**bot_message.history_static_output())
+                # pass key from history as collection to botmessage, bonusrequesthistory queryset as queryset param
+                return Response(status=status.HTTP_200_OK)
+
         return Response(status=status.HTTP_200_OK)
 
 
@@ -644,6 +687,24 @@ class ListUsersCommandView(APIView):
             return Response(status=status.HTTP_200_OK)
 
         slack_client.chat_postMessage(**message.access_denied())
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+
+class BonusRequestStatusChangeHistoryView(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
+    def post(self, request):
+        print(prettify_json(request.data))
+        channel_id = request.data.get("channel_id")
+        username = request.data.get("user_name")
+        is_admin = LannisterUser.objects.get(username=username).is_superuser
+        if is_admin:
+            bot_message = MessageWithDropdowns(channel=channel_id, username=username)
+            slack_client.chat_postMessage(**bot_message.history_dropdown())
+            return Response(status=status.HTTP_200_OK)
+
+        bot_message = BotMessage(channel=channel_id, username=username)
+        slack_client.chat_postMessage(**bot_message.access_denied())
         return Response(status=status.HTTP_403_FORBIDDEN)
 
 
