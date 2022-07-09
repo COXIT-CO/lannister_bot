@@ -56,6 +56,9 @@ class BonusRequestsHistory(models.Model):
     bonus_request = models.ForeignKey(
         BonusRequest, related_name="requests", on_delete=models.PROTECT
     )
+    status = models.ForeignKey(
+        "BonusRequestStatus", on_delete=models.PROTECT, null=True
+    )
     updated_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -77,9 +80,22 @@ class BonusRequestStatus(models.Model):
         verbose_name_plural = "Bonus statuses"
 
 
+def create_bonus_requests_status(sender, instance, *args, **kwargs):
+    BonusRequestStatus.objects.get_or_create(status_name="Created")
+    BonusRequestStatus.objects.get_or_create(status_name="Approved")
+    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
+    BonusRequestStatus.objects.get_or_create(status_name="Done")
+
+
+pre_save.connect(create_bonus_requests_status, BonusRequest)
+
+
 def create_history(sender, instance, created, *args, **kwargs):
     if created:
         BonusRequestsHistory.objects.get_or_create(bonus_request=instance)
+
+
+post_save.connect(create_history, BonusRequest)
 
 
 @receiver(post_save, sender=BonusRequest)
@@ -92,13 +108,3 @@ def add_bonus_request_on_status_status_change_to_history(
         or previous.bonus_request.status.status_name == instance.status.status_name
     ):
         BonusRequestsHistory.objects.create(bonus_request=instance)
-
-
-def create_bonus_requests_status(sender, instance, *args, **kwargs):
-    BonusRequestStatus.objects.get_or_create(status_name="Created")
-    BonusRequestStatus.objects.get_or_create(status_name="Approved")
-    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
-    BonusRequestStatus.objects.get_or_create(status_name="Done")
-
-
-pre_save.connect(create_bonus_requests_status, BonusRequest)
