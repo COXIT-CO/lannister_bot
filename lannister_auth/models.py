@@ -84,6 +84,7 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     slack_user_id = models.CharField(max_length=100, blank=True, null=True)
+    slack_channel_id = models.CharField(max_length=100, blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     roles = models.ManyToManyField(Role)
