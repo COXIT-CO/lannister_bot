@@ -300,3 +300,41 @@ def test_list_users_non_workspace_member(
         },
     )
     assert response.status_code == 403
+
+
+def test_history_access_non_admin_user(api_client_reviewer, reviewer_user):
+    url = reverse("history")
+    response = api_client_reviewer.post(
+        url,
+        {
+            "user_name": reviewer_user.username,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_history_access_non_workspace_user(
+    api_client_not_registered_in_workspace, non_workspace_member
+):
+    url = reverse("history")
+    response = api_client_not_registered_in_workspace.post(
+        url,
+        {
+            "user_name": non_workspace_member.username,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_history_access_admin_user(api_client_admin, admin_user):
+    url = reverse("history")
+    response = api_client_admin.post(
+        url,
+        {
+            "user_name": admin_user.username,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 200
