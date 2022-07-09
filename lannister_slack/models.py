@@ -81,11 +81,13 @@ def create_history(sender, instance, created, *args, **kwargs):
 
 
 @receiver(post_save, sender=BonusRequest)
-def add_status_change_to_history(sender, instance, *args, **kwargs):
-    previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
+def add_bonus_request_on_status_status_change_to_history(
+    sender, instance, *args, **kwargs
+):
+    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).first()
     if (
         not previous
-        or previous.bonus_request.status.status_name != instance.status.status_name
+        or previous.bonus_request.status.status_name == instance.status.status_name
     ):
         BonusRequestsHistory.objects.create(bonus_request=instance)
 
