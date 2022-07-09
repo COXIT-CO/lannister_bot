@@ -56,11 +56,13 @@ class BonusRequestsHistory(models.Model):
     bonus_request = models.ForeignKey(
         BonusRequest, related_name="requests", on_delete=models.PROTECT
     )
+    updated_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Request id: {self.bonus_request.pk}, opened by {self.bonus_request.creator}"
 
     class Meta:
+        ordering = ("-updated_at",)
         verbose_name_plural = "Bonus requests history"
 
 
