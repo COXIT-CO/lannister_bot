@@ -29,7 +29,7 @@ def test_register_command_api_call_existing_workspace_member_any_role(
             "channel_id": "D03MK2ADT29",  # hardcoded channel name
         },
     )
-    assert response.status_code == 200  # not 201 cuz slack_user_id exists
+    assert response.status_code == 201
 
 
 def test_register_command_api_call_non_workspace_user(
