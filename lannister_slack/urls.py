@@ -13,6 +13,7 @@ from lannister_slack.views import (
     RemoveReviewerCommandView,
     ListUsersCommandView,
     BonusRequestStatusChangeHistoryView,
+    ListReviewableRequests,
 )
 from rest_framework.routers import DefaultRouter
 
@@ -31,6 +32,11 @@ urlpatterns = [
     ),
     path("history", BonusRequestStatusChangeHistoryView.as_view(), name="history"),
     path("list-users", ListUsersCommandView.as_view(), name="list-users"),
+    path(
+        "list-requests-to-review",
+        ListReviewableRequests.as_view(),
+        name="list-requests-to-review",
+    ),
 ]
 
 router = DefaultRouter()
