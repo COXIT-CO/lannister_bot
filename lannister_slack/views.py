@@ -66,17 +66,42 @@ class SlackEventView(APIView):
 
     def post(self, request):
         """
-        Echoes user's message written into bot's private messages or #slack-app channel
-        Hanging for now.
+        Returns help on users input (no slash commands)
+        NOTE: apparently u can't output more than 10 blocks in one message, so there are 3 instances of bot messages I guess
         """
         # print(f"Event: {prettify_json(request.data)}")
-        # event = request.data["event"]
-        # channel_id = event.get("channel")
+        event = request.data["event"]
+        channel_id = event.get("channel")
         # user_id = event.get("user_id")
         # text = event.get("text")
-        # if event["type"] == "message":
-        #     if BOT_ID != event["user"]:
-        #         slack_client.chat_postMessage(channel=channel_id, text=text)
+        requesting_user = LannisterUser.objects.get(slack_channel_id=channel_id)
+        if event["type"] == "message":
+            if BOT_ID != event.get("user"):
+                if event.get("text") in ["help", "Help", "HELP", "hELP"]:
+                    first_part_bot_message = BotMessage(
+                        channel=channel_id, username=requesting_user.username
+                    )
+                    # scuffed pagination thanks to slack's limit of 10 messages
+                    slack_client.chat_postMessage(
+                        **first_part_bot_message.help_message_first_five()
+                    )
+                    second_part_bot_message = BotMessage(
+                        channel=channel_id, username=requesting_user.username
+                    )
+                    slack_client.chat_postMessage(
+                        **second_part_bot_message.next_five_messages()
+                    )
+                    bot_message = BotMessage(
+                        channel=channel_id, username=requesting_user.username
+                    )
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*/list-users* - shows all users ADMIN ONLY"
+                        )
+                    )
+                    return Response(status=status.HTTP_200_OK)
+                # slack_client.chat_postMessage(channel=channel_id, text=text)
+
         return Response(status=status.HTTP_200_OK)
 
 

@@ -466,6 +466,89 @@ class BotMessage:
         print(prettify_json(self.response))
         return self.response
 
+    def help_message_first_five(self):  # slack's limitation of 10 messages per block
+        self.header["text"]["text"] = f"Hey, {self.username}, need some help?"
+        explainer = copy.deepcopy(self.body)
+        explainer["text"][
+            "text"
+        ] = "*Here you can see the list of all available commands.*\n*Pls use them when you want something from me.*"
+
+        commands = [
+            "*/register*",
+            "*/actions*",
+            "*/list-requests*",
+            "*/new-request*",
+            "*/edit-request*",
+        ]
+        help_messages = [
+            "Register by sending your channel_id to lannister-bot. You have to create an account through API beforehand\n*Hint*: *POST request at /api/auth/register",
+            "Command to see actions available to you.\nDEBUG: static for now",
+            "Shows history of requests sent by you",
+            "Create new bonus request",
+            "Edit existing request",
+        ]
+        for command, help_text in zip(commands, help_messages):
+            print(command, help_text)
+            command_block = copy.deepcopy(
+                self.markdown_text_from_multiple_horizontal_fields
+            )
+            command_block["text"] = command
+            self.multiple_horizontal_text_elements["fields"].append(command_block)
+
+            help_text_block = copy.deepcopy(
+                self.markdown_text_from_multiple_horizontal_fields
+            )
+            help_text_block["text"] = help_text
+            self.multiple_horizontal_text_elements["fields"].append(help_text_block)
+
+        self.response["blocks"] = [
+            self.divider,
+            self.header,
+            self.divider,
+            explainer,
+            self.divider,
+            self.multiple_horizontal_text_elements,
+        ]
+
+        print(prettify_json(self.response))
+        return self.response
+
+    def next_five_messages(self):
+        commands = [
+            "*/review-request*",
+            "*/add-reviewer*",
+            "*/remove-reviewer*",
+            "*/history*",
+            "*/list-requests-to-review*",
+        ]
+        help_messages = [
+            "*ADMIN, REVIEWER* Select and review bonus request ticket sent by another user",
+            "Add reviewer to your request, if something happened to previous one",
+            "*ADMIN ONLY* Slam it if you really hate that dude",
+            "*ADMIN ONLY* Shows history of selected request,",
+            "*ADMIN REVIEWER* Shows all requests assigned to review to you",
+        ]
+
+        for command, help_text in zip(commands, help_messages):
+            command_block = copy.deepcopy(
+                self.markdown_text_from_multiple_horizontal_fields
+            )
+            command_block["text"] = command
+            self.multiple_horizontal_text_elements["fields"].append(command_block)
+
+            help_text_block = copy.deepcopy(
+                self.markdown_text_from_multiple_horizontal_fields
+            )
+            help_text_block["text"] = help_text
+            self.multiple_horizontal_text_elements["fields"].append(help_text_block)
+
+        self.response["blocks"] = [
+            self.multiple_horizontal_text_elements,
+        ]
+
+        print(prettify_json(self.response))
+        return self.response
+
 
 class ModalMessage(BotMessage):
     def __init__(self, channel, username, collection=None):
