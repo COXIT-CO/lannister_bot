@@ -19,6 +19,7 @@ from lannister_slack.utils import (
     ModalMessage,
     MessageWithDropdowns,
     get_all_bonus_request_statuses,
+    schedule_message_notification,
 )
 from lannister_slack.permissions import (
     IsMemberOfSlackWorkspace,
@@ -114,6 +115,8 @@ class InteractivesHandler(APIView):
                 list(acquired_from_modal_messages[0].keys())[0]
                 == "new_bonus_request_modal_type"
             ):
+                channel_id = loads.get("view").get("blocks")[0].get("block_id")
+                bot_message = BotMessage(channel=channel_id, username=username)
                 selected_bonus_type = acquired_from_modal_messages[0][
                     "new_bonus_request_modal_type"
                 ]["selected_option"]["text"]["text"]
@@ -127,9 +130,24 @@ class InteractivesHandler(APIView):
                 provided_pay_date_str = acquired_from_modal_messages[4][
                     "datepicker-action"
                 ]["selected_date"]
-                provided_pay_date_datetime = datetime.strptime(
-                    provided_pay_date_str, "%Y-%m-%d"
+                provided_pay_time_str = acquired_from_modal_messages[5][
+                    "new_bonus_request_selected_time"
+                ]["selected_time"]
+
+                provided_datetime = datetime.combine(
+                    datetime.strptime(provided_pay_date_str, "%Y-%m-%d"),
+                    datetime.strptime(provided_pay_time_str, "%H:%M").time(),
                 )
+                try:
+                    provided_amount = float(provided_amount)
+                except ValueError:
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Amount should be a decimal ie: 123.00, 123, 321*"
+                        )
+                    )
+                    return Response(status=status.HTTP_200_OK)
+
                 user = LannisterUser.objects.get(username=username)
                 reviewer = LannisterUser.objects.get(username=provided_reviewer)
                 default_status = BonusRequestStatus.objects.get(status_name="Created")
@@ -138,27 +156,42 @@ class InteractivesHandler(APIView):
                     reviewer=reviewer,
                     bonus_type=selected_bonus_type,
                     description=provided_description,
-                    payment_date=provided_pay_date_datetime,
+                    payment_date=provided_datetime,
                     price_usd=float(provided_amount),
                     status=default_status,
                 )
-                new_bonus_request.save()
 
-                channel_id = loads.get("view").get("blocks")[0].get("block_id")
-                bot_message = BotMessage(channel=channel_id, username=username)
-                slack_client.chat_postMessage(
-                    **bot_message.base_styled_message(
-                        "*Bonus request was registered successfully*"
+                try:
+                    schedule_message_notification(
+                        channel=reviewer.slack_channel_id,
+                        username=username,
+                        collection=new_bonus_request,
+                        timestamp=provided_datetime,
                     )
-                )
-                bot_notification_to_reviewer = BotMessage(
-                    channel=reviewer.slack_channel_id,
-                    username=username,
-                    collection=new_bonus_request,
-                )  # NOTE: username param here is the username of the user filling out new bonus request to show his name to reviewer.
-                slack_client.chat_postMessage(
-                    **bot_notification_to_reviewer.notification_for_reviewer()
-                )
+                    new_bonus_request.save()
+
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Bonus request was registered successfully*"
+                        )
+                    )
+                    bot_notification_to_reviewer = BotMessage(
+                        channel=reviewer.slack_channel_id,
+                        username=username,
+                        collection=new_bonus_request,
+                    )  # NOTE: username param here is the username of the user filling out new bonus request to show his name to reviewer.
+                    slack_client.chat_postMessage(
+                        **bot_notification_to_reviewer.notification_for_reviewer()
+                    )
+                except SlackApiError:
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Did you select a correct date and time?*\n*I cannot notify a reviewer in the past*\n"
+                        )
+                    )
+                    return Response(
+                        status=status.HTTP_200_OK
+                    )  # slack doesn't close modals on 40x errors
                 return Response(status=status.HTTP_200_OK)
 
             if (
@@ -181,21 +214,49 @@ class InteractivesHandler(APIView):
                     .get("edit_request_description_from_modal")
                     .get("value")
                 )
-
-                bonus_request = BonusRequest.objects.get(id=request_id)
-                bonus_request.bonus_type = bonus_type
-                bonus_request.description = description
-                bonus_request.save()
-
                 channel_id = (
                     loads.get("view").get("blocks")[0].get("block_id")
                 )  # see comment in utils.py modal_on_bonus_request_edit() method
                 bot_message = BotMessage(channel=channel_id, username=username)
-                slack_client.chat_postMessage(
-                    **bot_message.base_styled_message(
-                        "*Bonus request updated successfully*"
+
+                bonus_request = BonusRequest.objects.get(id=request_id)
+                created_status = BonusRequestStatus.objects.get(status_name="Created")
+                request_in_history = BonusRequestsHistory.objects.filter(
+                    bonus_request=bonus_request
+                ).first()
+                print(request_in_history)
+                if bonus_request.status != created_status:
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*This ticket was already reviewed.*\n*Consider adding a new ticket*"
+                        )
                     )
-                )
+                    return Response(
+                        status=status.HTTP_200_OK
+                    )  # have to return 200 or modal won't close and user will sit with WTF on his face
+
+                bonus_request.bonus_type = bonus_type
+                bonus_request.description = description
+                bonus_request.save()
+
+                try:
+                    schedule_message_notification(
+                        channel=channel_id,
+                        username=username,
+                        collection=bonus_request,
+                        timestamp=bonus_request.payment_date,
+                    )
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Bonus request updated successfully*"
+                        )
+                    )
+                except SlackApiError:
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*Payment date of this request was expired*\n*Submit new ticket if you want*"
+                        )
+                    )
                 return Response(status=status.HTTP_200_OK)
 
             # find all the fields that were sent from modal element
