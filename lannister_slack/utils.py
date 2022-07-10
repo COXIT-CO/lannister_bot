@@ -1,6 +1,6 @@
 import copy
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from lannister_auth.models import LannisterUser
 from lannister_auth.serializers import UserSerializer
 from lannister_slack.models import BonusRequest, BonusRequestStatus
@@ -9,6 +9,7 @@ from lannister_slack.serializers import (
     BonusRequestStatusSerializer,
     BonusRequestHistory,
 )
+from .views import slack_client
 
 
 def prettify_json(data):
@@ -50,6 +51,15 @@ def get_all_bonus_request_statuses():
     ]
     print(statuses)
     return statuses
+
+
+def schedule_message_notification(channel, username, collection, timestamp):
+    ts_to_epoch = timestamp.strftime("%s")
+    bot_message = BotMessage(
+        channel=channel, username=username, collection=collection, queryset=ts_to_epoch
+    )
+    slack_client.chat_scheduleMessage(**bot_message.notification_for_reviewer())
+    return
 
 
 # def convert_date_to_readable_eu_format(date):
@@ -186,6 +196,25 @@ class BotMessage:
             },
             "label": {"type": "plain_text", "text": None, "emoji": True},
         }
+        self.timepicker = {
+            "type": "input",
+            "element": {
+                "type": "timepicker",
+                "initial_time": "10:00",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select time",
+                    "emoji": True,
+                },
+                "action_id": None,
+            },
+            "label": {
+                "type": "plain_text",
+                "text": None,
+                "emoji": True,
+            },
+        }
+
         self.multi_static_select = {
             "type": "input",
             "element": {
@@ -297,6 +326,12 @@ class BotMessage:
 
     def notification_for_reviewer(self):
         self.header["text"]["text"] = "Hey, You! New bonus request to review"
+        if self.queryset:  # check if timestamp for scheduled message exists
+            self.response["post_at"] = self.queryset
+            self.header["text"][
+                "text"
+            ] = "Deadline of this request is right now. Pls approve or reject:"
+            self.response["text"] = "reviewer_notification"
         serialize_bonus_request = BonusRequestSerializer(self.collection)
         ticket_creator = self.body
         ticket_creator["text"][
@@ -529,6 +564,14 @@ class ModalMessage(BotMessage):
         self.datepicker["element"]["initial_date"] = datetime.today().strftime(
             "%Y-%m-%d"
         )
+
+        self.timepicker["element"]["initial_time"] = (
+            datetime.now() + timedelta(minutes=1)
+        ).strftime("%H:%M")
+        self.timepicker["element"]["placeholder"]["text"] = "Pick a payment time"
+        self.timepicker["element"]["action_id"] = "new_bonus_request_selected_time"
+        self.timepicker["label"]["text"] = "Pick a payment time"
+
         reviewers = get_all_reviewers()
         reviewers_dropdown["label"]["text"] = "Select a reviewer"
         reviewers_dropdown["element"][
@@ -552,6 +595,7 @@ class ModalMessage(BotMessage):
             reviewers_dropdown,
             self.input,
             self.datepicker,
+            self.timepicker,
         ]
         print(prettify_json(self.response))
         return self.response
