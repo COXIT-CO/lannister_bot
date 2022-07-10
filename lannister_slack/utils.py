@@ -449,6 +449,23 @@ class BotMessage:
         print(prettify_json(self.response))
         return self.response
 
+    def list_reviewable_requests_by_current_reviewer(self):
+        self.header["text"]["text"] = "Assigned bonus request tickets to me"
+        serialized_tickets = [
+            BonusRequestSerializer(item).data for item in self.collection
+        ]
+        print(serialized_tickets)
+        self.response["blocks"] = [self.divider, self.header]
+        for ticket in serialized_tickets:
+            ticket_data = copy.deepcopy(self.body)
+            ticket_data["text"][
+                "text"
+            ] = f"Ticket id: *#{ticket['id']}*\nSubmitted by: *{ticket['creator']['username']}*\nStatus: *{ticket['status']['status_name']}*\nPayment date: *{ticket['payment_date']}*\nDescription: *{ticket['description']}*\nLast time updated at: *{ticket['updated_at']}*"
+            self.response["blocks"].append(ticket_data)
+
+        print(prettify_json(self.response))
+        return self.response
+
 
 class ModalMessage(BotMessage):
     def __init__(self, channel, username, collection=None):
@@ -624,7 +641,7 @@ class MessageWithDropdowns(BotMessage):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"{request['bonus_type']} by: {request['creator']['username']} at {request['created_at']}"
+            ] = f"id: {request['id']} {request['bonus_type']} by: {request['creator']['username']} at {request['created_at']}"
             option["value"] = f"value-{index}"
             options.append(option)
 
