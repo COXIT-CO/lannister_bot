@@ -291,11 +291,38 @@ class InteractivesHandler(APIView):
                         "selected_option"
                     ):
                         HANGING_INPUT_FIELD = False
-
+                        request_id = re.findall(
+                            r"\s[0-9]+\s",
+                            request_from_dropdown.get("select_request")
+                            .get("selected_option")
+                            .get("text")
+                            .get("text"),
+                        )[0].strip()
+                        selected_bonus_request = BonusRequest.objects.get(
+                            id=int(request_id)
+                        )
+                        selected_reviewer_username = (
+                            reviewer_from_dropdown.get("select_reviewer")
+                            .get("selected_option")
+                            .get("text")
+                            .get("text")
+                        )
+                        selected_bonus_request.reviewer = LannisterUser.objects.get(
+                            username=selected_reviewer_username
+                        )
+                        selected_bonus_request.save()
                         slack_client.chat_postMessage(
                             **bot_message.base_styled_message(
-                                "*Reviewer assigned successfully.\nHe'll get notification #TODO*"
+                                "*Reviewer assigned successfully.*\n"
                             )
+                        )
+                        message_reviewer = BotMessage(
+                            channel=selected_bonus_request.reviewer.slack_channel_id,
+                            username=selected_bonus_request.reviewer.username,
+                            collection=selected_bonus_request,
+                        )
+                        slack_client.chat_postMessage(
+                            **message_reviewer.notification_for_reviewer()
                         )
                         return Response(status=status.HTTP_200_OK)
 
@@ -772,6 +799,33 @@ class BonusRequestStatusChangeHistoryView(APIView):
         if is_admin:
             bot_message = MessageWithDropdowns(channel=channel_id, username=username)
             slack_client.chat_postMessage(**bot_message.history_dropdown())
+            return Response(status=status.HTTP_200_OK)
+
+        bot_message = BotMessage(channel=channel_id, username=username)
+        slack_client.chat_postMessage(**bot_message.access_denied())
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+
+class ListReviewableRequests(APIView):
+    permission_classes = (IsMemberOfSlackWorkspace,)
+
+    def post(self, request):
+        channel_id = request.data.get("channel_id")
+        username = request.data.get("user_name")
+        is_reviewer = (
+            Role.objects.get(id=2)
+            in LannisterUser.objects.get(username=username).roles.all()
+        )
+        if is_reviewer:
+            reviewable_tickets = BonusRequest.objects.filter(
+                reviewer__username=username
+            )
+            bot_message = BotMessage(
+                channel=channel_id, username=username, collection=reviewable_tickets
+            )
+            slack_client.chat_postMessage(
+                **bot_message.list_reviewable_requests_by_current_reviewer()
+            )
             return Response(status=status.HTTP_200_OK)
 
         bot_message = BotMessage(channel=channel_id, username=username)
