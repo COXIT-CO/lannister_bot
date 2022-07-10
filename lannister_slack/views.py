@@ -423,6 +423,7 @@ class InteractivesHandler(APIView):
                         .get("text")
                     )
                     request = BonusRequest.objects.get(id=int(selected_request_id))
+                    tickets_creator = request.creator
                     status_obj = BonusRequestStatus.objects.get(
                         status_name=selected_status_type
                     )
@@ -432,6 +433,15 @@ class InteractivesHandler(APIView):
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
                             "*Status updated successfully*"
+                        )
+                    )
+                    message_worker = BotMessage(
+                        channel=tickets_creator.slack_channel_id,
+                        username=tickets_creator.username,
+                    )
+                    slack_client.chat_postMessage(
+                        **message_worker.base_styled_message(
+                            f"*Hey, {tickets_creator.username}, your ticket was reviewed*"
                         )
                     )
                     return Response(status=status.HTTP_200_OK)
