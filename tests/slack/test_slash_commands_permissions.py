@@ -338,3 +338,41 @@ def test_history_access_admin_user(api_client_admin, admin_user):
         },
     )
     assert response.status_code == 200
+
+
+def test_list_requests_to_review(api_client_reviewer, reviewer_user):
+    url = reverse("list-requests-to-review")
+    response = api_client_reviewer.post(
+        url,
+        {
+            "user_name": reviewer_user.username,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 200
+
+
+def test_is_list_requests_accessible_to_worker(api_client_worker, worker_user):
+    url = reverse("list-requests-to-review")
+    response = api_client_worker.post(
+        url,
+        {
+            "user_name": worker_user.username,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_is_list_accesible_to_non_workspace_member(
+    api_client_not_registered_in_workspace, non_workspace_member
+):
+    url = reverse("list-requests-to-review")
+    response = api_client_not_registered_in_workspace.post(
+        url,
+        {
+            "user_name": non_workspace_member,
+            "channel_id": "D03MK2ADT29",
+        },
+    )
+    assert response.status_code == 403
