@@ -22,7 +22,7 @@ class BonusRequestStatus(models.Model):
         verbose_name_plural = "Bonus statuses"
 
 def set_request_status():
-    """ get a default value for request status; create new status if not available """
+    """ create new statuses. Get default status """
     BonusRequestStatus.objects.get_or_create(status_name="Created")
     BonusRequestStatus.objects.get_or_create(status_name="Approved")
     BonusRequestStatus.objects.get_or_create(status_name="Rejected")
@@ -63,6 +63,12 @@ class BonusRequest(models.Model):
             raise ValueError(
                 _(
                     "Selected user is not a reviewer. Select a valid user with reviewer role."
+                )
+            )
+        if self.reviewer == self.creator:
+            raise ValueError(
+                _(
+                    "You cannot review self request."
                 )
             )
         self.reviewer = reviewer
@@ -111,9 +117,11 @@ TODO: Refactor history creating
 #     if not previous or previous.bonus_request.status != instance.status:
 #         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
 
-
 @receiver(post_save, sender=BonusRequest)
-def add_status_to_history(sender, instance, *args, **kwargs):
-    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-date").first()
-    if previous.status != instance.status:
+def add_status_to_history(sender, created, instance, *args, **kwargs):
+    if created:
         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-date").first()
+    if previous and previous.status != instance.status:
+        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+
