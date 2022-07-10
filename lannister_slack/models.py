@@ -57,7 +57,8 @@ class BonusRequestsHistory(models.Model):
         BonusRequest, related_name="requests", on_delete=models.PROTECT
     )
     status = models.ForeignKey(
-        "BonusRequestStatus", on_delete=models.PROTECT, null=True
+        "BonusRequestStatus",
+        on_delete=models.PROTECT,
     )
     updated_at = models.DateTimeField(auto_now_add=True)
 
@@ -90,14 +91,6 @@ def create_bonus_requests_status(sender, instance, *args, **kwargs):
 pre_save.connect(create_bonus_requests_status, BonusRequest)
 
 
-def create_history(sender, instance, created, *args, **kwargs):
-    if created:
-        BonusRequestsHistory.objects.get_or_create(bonus_request=instance)
-
-
-post_save.connect(create_history, BonusRequest)
-
-
 @receiver(post_save, sender=BonusRequest)
 def add_bonus_request_on_status_status_change_to_history(
     sender, instance, *args, **kwargs
@@ -107,4 +100,8 @@ def add_bonus_request_on_status_status_change_to_history(
         not previous
         or previous.bonus_request.status.status_name == instance.status.status_name
     ):
-        BonusRequestsHistory.objects.create(bonus_request=instance)
+        BonusRequestsHistory.objects.create(
+            bonus_request=instance,
+            status=instance.status,
+            updated_at=instance.updated_at,
+        )
