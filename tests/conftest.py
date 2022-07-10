@@ -1,7 +1,10 @@
 import pytest
 from mixer.backend.django import mixer
 from lannister_auth.models import LannisterUser, Role
-from lannister_slack.models import BonusRequest
+from lannister_slack.models import (
+    BonusRequest,
+    BonusRequestStatus,
+)
 from rest_framework.test import APIClient
 from django.urls import reverse
 
@@ -147,6 +150,11 @@ def api_client_not_registered_in_workspace(non_workspace_member_token):
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {non_workspace_member_token}")
     return client
+
+
+@pytest.fixture
+def dummy_status():
+    return mixer.blend(BonusRequestStatus)
 
 
 @pytest.fixture
