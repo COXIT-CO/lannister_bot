@@ -27,7 +27,7 @@ class BonusRequest(models.Model):
     description = models.CharField(max_length=255, blank=False)
     created_at = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now_add=True)
-    price_usd = models.DecimalField(max_digits=10, decimal_places=3)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
@@ -48,7 +48,7 @@ class BonusRequest(models.Model):
             super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
+        return f"id: {self.id}, {self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
 
 
 # TODO: implement history
@@ -96,10 +96,13 @@ def add_bonus_request_on_status_status_change_to_history(
     sender, instance, *args, **kwargs
 ):
     previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).first()
-    if (
-        not previous
-        or previous.bonus_request.status.status_name == instance.status.status_name
-    ):
+    if not previous:
+        BonusRequestsHistory.objects.create(
+            bonus_request=instance,
+            status=instance.status,
+            updated_at=instance.updated_at,
+        )
+    elif previous.bonus_request.status.status_name != instance.status.status_name:
         BonusRequestsHistory.objects.create(
             bonus_request=instance,
             status=instance.status,
