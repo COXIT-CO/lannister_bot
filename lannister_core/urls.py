@@ -29,6 +29,7 @@ urlpatterns = [
             [
                 path("auth/", include("lannister_auth.urls")),
                 path("slack/", include("lannister_slack.urls")),
+                path("workers/", include("workers_api.urls")),
             ]
         ),
     ),
