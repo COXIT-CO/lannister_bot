@@ -1,6 +1,8 @@
 from rest_framework.permissions import BasePermission
 
-
+"""
+Skeleton for Roles implementing
+"""
 class IsUser(BasePermission):
     allowed_methods = ["GET", "POST", "PUT", "PATCH"]
 
