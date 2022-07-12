@@ -51,7 +51,6 @@ class BonusRequest(models.Model):
         return f"id: {self.id}, {self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
 
 
-# TODO: implement history
 class BonusRequestsHistory(models.Model):
     bonus_request = models.ForeignKey(
         BonusRequest, related_name="requests", on_delete=models.PROTECT
