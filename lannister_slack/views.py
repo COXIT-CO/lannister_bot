@@ -27,6 +27,7 @@ from lannister_slack.permissions import (
 )
 from lannister_auth.models import LannisterUser, Role
 from slack_sdk.errors import SlackApiError
+from django.utils import timezone
 
 
 @api_view(["POST"])
@@ -96,13 +97,13 @@ class SlackEventView(APIView):
                     )
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
-                            "*/list-users* - shows all users ADMIN ONLY"
+                            f"*/list-users* - shows all users ADMIN ONLY\nYour channel id: {channel_id}\nYour slack username: {requesting_user.username}"
                         )
                     )
                     return Response(status=status.HTTP_200_OK)
                 # slack_client.chat_postMessage(channel=channel_id, text=text)
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 class InteractivesHandler(APIView):
@@ -175,7 +176,9 @@ class InteractivesHandler(APIView):
 
                 user = LannisterUser.objects.get(username=username)
                 reviewer = LannisterUser.objects.get(username=provided_reviewer)
-                default_status = BonusRequestStatus.objects.get(status_name="Created")
+                default_status, created = BonusRequestStatus.objects.get_or_create(
+                    status_name="Created"
+                )
                 new_bonus_request = BonusRequest.objects.create(
                     creator=user,
                     reviewer=reviewer,
@@ -185,6 +188,7 @@ class InteractivesHandler(APIView):
                     price_usd=float(provided_amount),
                     status=default_status,
                 )
+                new_bonus_request.save()
 
                 try:
                     schedule_message_notification(
@@ -193,7 +197,6 @@ class InteractivesHandler(APIView):
                         collection=new_bonus_request,
                         timestamp=provided_datetime,
                     )
-                    new_bonus_request.save()
 
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
@@ -208,16 +211,17 @@ class InteractivesHandler(APIView):
                     slack_client.chat_postMessage(
                         **bot_notification_to_reviewer.notification_for_reviewer()
                     )
-                except SlackApiError:
+                    return Response(status=status.HTTP_200_OK)
+                except SlackApiError as e:
+                    print(e)
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
                             "*Did you select a correct date and time?*\n*I cannot notify a reviewer in the past*\n"
                         )
                     )
                     return Response(
-                        status=status.HTTP_200_OK
+                        status=status.HTTP_403_FORBIDDEN
                     )  # slack doesn't close modals on 40x errors
-                return Response(status=status.HTTP_200_OK)
 
             if (
                 list(acquired_from_modal_messages[0].keys())[0]
@@ -245,6 +249,7 @@ class InteractivesHandler(APIView):
                 bot_message = BotMessage(channel=channel_id, username=username)
 
                 bonus_request = BonusRequest.objects.get(id=request_id)
+                print(f"applied tz: {timezone.localtime(bonus_request.payment_date)}")
                 created_status = BonusRequestStatus.objects.get(status_name="Created")
                 request_in_history = BonusRequestsHistory.objects.filter(
                     bonus_request=bonus_request
@@ -269,14 +274,15 @@ class InteractivesHandler(APIView):
                         channel=channel_id,
                         username=username,
                         collection=bonus_request,
-                        timestamp=bonus_request.payment_date,
+                        timestamp=timezone.localtime(bonus_request.payment_date),
                     )
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
                             "*Bonus request updated successfully*"
                         )
                     )
-                except SlackApiError:
+                except SlackApiError as e:
+                    print(e)
                     slack_client.chat_postMessage(
                         **bot_message.base_styled_message(
                             "*Payment date of this request was expired*\n*Submit new ticket if you want*"
