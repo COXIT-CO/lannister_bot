@@ -5,7 +5,7 @@ from lannister_slack.models import (
     BonusRequest,
     BonusRequestStatus,
 )
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 from django.urls import reverse
 
 
@@ -40,6 +40,7 @@ def admin_user(admin_role, reviewer_role, worker_role):
     )
     user.roles.add(admin_role, reviewer_role, worker_role)
     user.slack_user_id = "wasdaqwe"
+    user.slack_channel_id = "D03MK2ADT29"
     user.save()
     return user
 
@@ -160,3 +161,22 @@ def dummy_status():
 @pytest.fixture
 def dummy_bonus_request():
     return mixer.blend(BonusRequest)
+
+
+@pytest.fixture
+def request_command_mock(mocker):
+    mock_slash_register = mocker.patch(
+        "lannister_slack.views.SlackEventView",
+    )
+    mock_slash_register.return_value.data = {
+        "team_id": "T03MJUGC8HK",  #
+        "channel_name": "directmessage",
+        "command": "/register",
+    }
+    return mock_slash_register.return_value.data
+
+
+@pytest.fixture
+def factory():
+    factory = APIRequestFactory()
+    return factory
