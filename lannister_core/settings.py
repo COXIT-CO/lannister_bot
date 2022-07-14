@@ -1,11 +1,8 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-import environ
 
 # Initialise environment variables
-env = environ.Env()
-environ.Env.read_env()
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -34,7 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "lannister_auth",
     "lannister_slack",
-    "workers_api",
+    "api_workers",
     "lannister_requests",
     # 3rd party
     "rest_framework",
@@ -81,9 +78,9 @@ DATABASES = {
     # }
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": env("DB_NAME"),
-        "USER": env("POSTGRES_USER"),
-        "PASSWORD": env("POSTGRES_PASSWORD"),
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("POSTGRES_USER"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
         "HOST": "localhost",  # hide later
         "PORT": "5432",
     }
