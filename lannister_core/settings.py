@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "lannister_slack",
     "api_workers",
     "lannister_requests",
+    "lannister_roles",
     # 3rd party
     "rest_framework",
 ]
