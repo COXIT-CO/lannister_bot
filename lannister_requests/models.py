@@ -21,6 +21,7 @@ class BonusRequestStatus(models.Model):
         verbose_name = "Bonus status"
         verbose_name_plural = "Bonus statuses"
 
+
 def set_request_status():
     """ create new statuses. Get default status """
     BonusRequestStatus.objects.get_or_create(status_name="Created")
@@ -31,12 +32,6 @@ def set_request_status():
     return default.pk
 
 class BonusRequest(models.Model):
-    # class BonusRequestStatus(models.TextChoices):
-    #     CREATED = "Cr", _("Created")
-    #     APPROVED = "Appr", _("Approved")
-    #     REJECTED = "Rj", _("Rejected")
-    #     DONE = "Done", _("Done")
-
     class BonusRequestType(models.TextChoices):
         REFERAL = "Referral", _("Referral")
         OVERTIME = "Overtime", _("Overtime")
@@ -53,8 +48,8 @@ class BonusRequest(models.Model):
     description = models.CharField(max_length=255, blank=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    price_usd = models.DecimalField(max_digits=10, decimal_places=3, null=True)
-    payment_date = models.DateTimeField(null=True)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         reviewer = LannisterUser.objects.get(username=self.reviewer.username)
@@ -81,11 +76,6 @@ class BonusRequest(models.Model):
         db_table = "bonus_requests"
 
 
-# TODO: implement history
-
-"""
-TODO: Refactor request history
-"""
 class BonusRequestsHistory(models.Model):
 
     bonus_request = models.ForeignKey(
@@ -103,20 +93,6 @@ class BonusRequestsHistory(models.Model):
         db_table = "bonus_requests_history"
         verbose_name_plural = "Bonus requests history"
 
-"""
-TODO: Refactor history creating
-"""
-# def create_history(sender, instance, created, *args, **kwargs):
-#     if created:
-#         BonusRequestsHistory.objects.get_or_create(bonus_request=instance, status=instance.status, date=instance.updated_at)
-#
-#
-# @receiver(post_save, sender=BonusRequest)
-# def add_status_change_to_history(sender, instance, *args, **kwargs):
-#     previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
-#     if not previous or previous.bonus_request.status != instance.status:
-#         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
-
 @receiver(post_save, sender=BonusRequest)
 def add_status_to_history(sender, created, instance, *args, **kwargs):
     if created:
@@ -124,4 +100,5 @@ def add_status_to_history(sender, created, instance, *args, **kwargs):
     previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-date").first()
     if previous and previous.status != instance.status:
         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+
 
