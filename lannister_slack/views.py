@@ -2,10 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
-from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
-from lannister_slack.models import BonusRequest
-from lannister_slack.serializers import BonusRequestSerializer
 
 import json
 
@@ -51,6 +48,3 @@ class SlackEventView(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class BonusRequestViewSet(ModelViewSet):
-    queryset = BonusRequest.objects.all()
-    serializer_class = BonusRequestSerializer

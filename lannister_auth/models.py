@@ -4,10 +4,9 @@ from django.contrib.auth.models import (
     AbstractBaseUser,
     PermissionsMixin,
 )
-from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import pre_save
-
+from django.utils.translation import gettext_lazy as _
 
 """
 NOTE: following models/managers are used for building out the skeleton
@@ -25,7 +24,7 @@ class BaseManager(BaseUserManager):
 
 class LannisterUserManager(BaseManager):
     def create_user(
-        self, email, username, password, first_name, last_name, **other_fields
+            self, email, username, password, first_name, last_name, **other_fields
     ):
         if not username:
             raise ValueError(_("Please provide username"))
@@ -45,7 +44,7 @@ class LannisterUserManager(BaseManager):
         return user
 
     def create_superuser(
-        self, email, username, password, first_name, last_name, **other_fields
+            self, email, username, password, first_name, last_name, **other_fields
     ):
         user = self.create_user(email, username, password, first_name, last_name)
         user.is_superuser = True
