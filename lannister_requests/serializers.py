@@ -15,20 +15,20 @@ For per-field permissions(update method)
 class BonusRequestAdminSerializer(ModelSerializer):
     class Meta:
         model = BonusRequest
-        fields = "__all__"
+        fields = ['id', 'creator', 'reviewer', 'status', 'bonus_type', 'description', 'created_at', 'updated_at', 'price_usd', 'payment_date']
         read_only_fields = ('created_at', 'updated_at',)
 
 class BonusRequestRewieverSerializer(ModelSerializer):
     class Meta:
         model = BonusRequest
-        fields = "__all__"
-        read_only_fields = ('creator', 'reviewer', 'description', 'created_at', 'updated_at',)
+        fields = ['id', 'creator', 'reviewer', 'status', 'bonus_type', 'description', 'created_at', 'updated_at', 'price_usd', 'payment_date']
+        read_only_fields = ('creator', 'created_at', 'updated_at',)
 
 class BonusRequestBaseSerializer(ModelSerializer):
     class Meta:
         model = BonusRequest
-        fields = "__all__"
-        read_only_fields = ('creator', 'created_at', 'updated_at', 'price_usd', 'payment_date', )
+        fields = ['id', 'creator', 'reviewer', 'status', 'bonus_type', 'description', 'created_at', 'updated_at', 'price_usd', 'payment_date']
+        read_only_fields = ('creator', 'status', 'created_at', 'updated_at', 'price_usd', 'payment_date',)
 
 class BonusRequestHistorySerializer(ModelSerializer):
     class Meta:
@@ -41,6 +41,7 @@ class FullHistorySerializer(ModelSerializer):
     class Meta:
         model = BonusRequest
         fields = ['id', 'creator', 'reviewer', 'bonus_type', 'price_usd', 'payment_date', 'history_requests']
+        read_only_fields = ['id', 'creator', 'reviewer', 'bonus_type', 'price_usd', 'payment_date', 'history_requests']
 
 class BonusRequestStatusSerializer(ModelSerializer):
     class Meta:
