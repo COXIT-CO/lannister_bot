@@ -1,8 +1,8 @@
 from django.urls import path
 
-from .views import ListWorker, DetailWorker
+from .views import WorkerViewSet
 
 urlpatterns = [
-    path('', ListWorker.as_view()),
-    path('<int:pk>/', DetailWorker.as_view()),
+    path('', WorkerViewSet.as_view({'get': 'list'})),
+    path('<int:pk>/', WorkerViewSet.as_view({'get': 'retrieve', 'delete': 'destroy', 'patch': 'partial_update'})),
 ]
