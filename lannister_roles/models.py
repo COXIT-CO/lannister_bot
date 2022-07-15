@@ -11,9 +11,5 @@ class Role(models.Model):
     def __str__(self):
         return self.name
 
-def set_user_role():
-    """ create new statuses. Get default status """
-    default = Role.objects.get_or_create(name="Worker")
-    return default.pk
 
 

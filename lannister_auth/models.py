@@ -55,6 +55,10 @@ class LannisterUserManager(BaseManager):
         return user
 
 
+def set_user_role():
+    """ Get default status """
+    default = Role.objects.get_or_create(name="Worker")
+    return default.pk
 
 class LannisterUser(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=100, unique=True)
@@ -64,7 +68,7 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
     slack_user_id = models.CharField(max_length=100, blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    roles = models.ManyToManyField(Role)
+    roles = models.ManyToManyField(Role, default=set_user_role)
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email", "first_name", "last_name"]
 
