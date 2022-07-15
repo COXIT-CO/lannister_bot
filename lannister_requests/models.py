@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from lannister_auth.models import LannisterUser, Role
@@ -23,12 +23,8 @@ class BonusRequestStatus(models.Model):
 
 
 def set_request_status():
-    """ create new statuses. Get default status """
-    BonusRequestStatus.objects.get_or_create(status_name="Created")
-    BonusRequestStatus.objects.get_or_create(status_name="Approved")
-    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
-    BonusRequestStatus.objects.get_or_create(status_name="Done")
-    default = BonusRequestStatus.objects.get(status_name="Created")
+    """ Get default status """
+    default = BonusRequestStatus.objects.get_or_create(status_name="Created")
     return default.pk
 
 class BonusRequest(models.Model):
@@ -101,4 +97,9 @@ def add_status_to_history(sender, created, instance, *args, **kwargs):
     if previous and previous.status != instance.status:
         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
 
-
+@receiver(pre_save, sender=BonusRequest)
+def create_roles(sender, instance, *args, **kwargs):
+    BonusRequestStatus.objects.get_or_create(status_name="Created")
+    BonusRequestStatus.objects.get_or_create(status_name="Approved")
+    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
+    BonusRequestStatus.objects.get_or_create(status_name="Done")
