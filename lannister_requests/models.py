@@ -25,7 +25,7 @@ class BonusRequestStatus(models.Model):
 def set_request_status():
     """ Get default status """
     default = BonusRequestStatus.objects.get_or_create(status_name="Created")
-    return default.pk
+    return default[0]
 
 class BonusRequest(models.Model):
     class BonusRequestType(models.TextChoices):

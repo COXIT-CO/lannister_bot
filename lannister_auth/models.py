@@ -57,8 +57,7 @@ class LannisterUserManager(BaseManager):
 
 def set_user_role():
     """ Get default status """
-    default = Role.objects.get_or_create(name="Worker")
-    return default.pk
+    return Role.objects.get_or_create(name="Worker")
 
 class LannisterUser(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=100, unique=True)
