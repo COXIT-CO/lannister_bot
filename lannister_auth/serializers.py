@@ -6,7 +6,14 @@ class UserSerializer(ModelSerializer):
     class Meta:
         ordering = ["id"]
         model = LannisterUser
-        fields = "__all__"  # exclude some fields like password later
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "slack_user_id",
+            "roles",
+        )
 
 
 class RoleSerializer(ModelSerializer):
