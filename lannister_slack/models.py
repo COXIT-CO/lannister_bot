@@ -1,13 +1,8 @@
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from lannister_auth.models import LannisterUser, Role
-
-"""
-NOTE: following models/managers are used for building out the skeleton
-      and should be adjusted when LAN-52 (DB schema) is finalized and agreed upon
-"""
 
 
 class BonusRequest(models.Model):
@@ -36,16 +31,21 @@ class BonusRequest(models.Model):
     payment_date = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
-        reviewer = LannisterUser.objects.get(username=self.reviewer.username)
-        is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
-        if not is_reviewer:
-            raise ValueError(
-                _(
-                    "Selected user is not a reviewer. Select a valid user with reviewer role."
+        try:
+            reviewer = LannisterUser.objects.get(username=self.reviewer.username)
+            is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
+            if not is_reviewer:
+                raise ValueError(
+                    _(
+                        "Selected user is not a reviewer. Select a valid user with reviewer role."
+                    )
                 )
-            )
-        self.reviewer = reviewer
-        super().save(*args, **kwargs)
+            self.reviewer = reviewer
+        except (AttributeError, ValueError):
+            # if reviewer is null
+            pass
+        finally:
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
@@ -83,5 +83,19 @@ def create_history(sender, instance, created, *args, **kwargs):
 @receiver(post_save, sender=BonusRequest)
 def add_status_change_to_history(sender, instance, *args, **kwargs):
     previous = BonusRequestsHistory.objects.filter(id=instance.id).first()
-    if not previous or previous.bonus_request.status != instance.bonus_request.status:
+    if (
+        not previous
+        or previous.bonus_request.status.status_name != instance.status.status_name
+    ):
         BonusRequestsHistory.objects.create(bonus_request=instance)
+
+
+def create_bonus_requests_status(sender, instance, created, *args, **kwargs):
+    if created:
+        BonusRequestStatus.objects.get_or_create(status_name="Created")
+        BonusRequestStatus.objects.get_or_create(status_name="Approved")
+        BonusRequestStatus.objects.get_or_create(status_name="Rejected")
+        BonusRequestStatus.objects.get_or_create(status_name="Done")
+
+
+pre_save.connect(create_bonus_requests_status, BonusRequest)
