@@ -1,5 +1,9 @@
 from rest_framework.serializers import ModelSerializer
-from lannister_slack.models import BonusRequest, BonusRequestStatus
+from lannister_slack.models import (
+    BonusRequest,
+    BonusRequestStatus,
+    BonusRequestsHistory,
+)
 from lannister_auth.serializers import UserSerializer
 
 
@@ -26,4 +30,14 @@ class BonusRequestSerializer(ModelSerializer):
             "payment_date",
             "creator",
             "reviewer",
+            "price_usd",
         ]
+
+
+class BonusRequestHistory(ModelSerializer):
+    bonus_request = BonusRequestSerializer()
+    status = BonusRequestStatusSerializer()
+
+    class Meta:
+        model = BonusRequestsHistory
+        fields = ["bonus_request", "status", "updated_at"]
