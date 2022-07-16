@@ -49,7 +49,7 @@ class BonusRequest(models.Model):
 
     def save(self, *args, **kwargs):
         reviewer = LannisterUser.objects.get(username=self.reviewer.username)
-        is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
+        is_reviewer = Role.objects.get(name="Reviewer") in reviewer.roles.all()
         if not is_reviewer:
             raise ValueError(
                 _(
