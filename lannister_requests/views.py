@@ -14,9 +14,8 @@ class BonusRequestViewSet(ModelViewSet):
 
     def get_serializer_class(self):
         if self.request.method == "PATCH":
-            # if self.request.user.is_superuser or self.request.user.is_staff \
-            #         or Role.objects.get(name="Administrator") in self.request.user.roles:
-            if Role.objects.get(name="Administrator") in self.request.user.roles.all():
+            if self.request.user.is_superuser or self.request.user.is_staff \
+                    or Role.objects.get(name="Administrator") in self.request.user.roles.all():
                 return BonusRequestAdminSerializer
             elif Role.objects.get(name="Reviewer") in self.request.user.roles.all():
                 return BonusRequestRewieverSerializer
