@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
-from lannister_slack.models import (
+from lannister_requests.models import (
     BonusRequest,
     BonusRequestStatus,
     BonusRequestsHistory,
