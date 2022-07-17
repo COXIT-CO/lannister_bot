@@ -5,12 +5,12 @@ from .serializers import WorkerSerializer
 from .serializers import RequestSerializer
 
 
-class ListWorker(generics.ListAPIView):
+class ListWorker(generics.ListCreateAPIView):
     queryset = LannisterUser.objects.all()
     serializer_class = WorkerSerializer
 
 
-class DetailWorker(generics.ListAPIView):
+class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
     queryset = LannisterUser.objects.all()
     serializer_class = WorkerSerializer
 

@@ -6,6 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="ce443ad5-53ad-4659-9184-27c81d018882" name="Changes" comment="Merge pull request #1 from COXIT-CO/LAN-56-API-skeleton&#10;&#10;Add API skeleton #LAN-56">
       <changelist_data name="Yehor Zhornovyi" email="47090110+zhornovyi@users.noreply.github.com" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api_workers/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/api_workers/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api_workers/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/api_workers/views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lannister_core/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/lannister_core/settings.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

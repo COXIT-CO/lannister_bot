@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import ListWorker, DetailWorker
+from .views import ListWorker
 from .views import ListWorkerRequest, DetailWorkerRequest
 
 urlpatterns = [
