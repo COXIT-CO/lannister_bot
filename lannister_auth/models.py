@@ -4,16 +4,9 @@ from django.contrib.auth.models import (
     AbstractBaseUser,
     PermissionsMixin,
 )
-from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import pre_save
-
-
-"""
-NOTE: following models/managers are used for building out the skeleton
-      and should be adjusted when LAN-52 (DB schema) is finalized and agreed upon
-"""
-
+from django.utils.translation import gettext_lazy as _
 
 class BaseManager(BaseUserManager):
     def get_or_none(self, **kwargs):
@@ -25,7 +18,7 @@ class BaseManager(BaseUserManager):
 
 class LannisterUserManager(BaseManager):
     def create_user(
-        self, email, username, password, first_name, last_name, **other_fields
+            self, email, username, password, first_name, last_name, **other_fields
     ):
         if not username:
             raise ValueError(_("Please provide username"))
@@ -45,7 +38,7 @@ class LannisterUserManager(BaseManager):
         return user
 
     def create_superuser(
-        self, email, username, password, first_name, last_name, **other_fields
+            self, email, username, password, first_name, last_name, **other_fields
     ):
         user = self.create_user(email, username, password, first_name, last_name)
         user.is_superuser = True
@@ -73,6 +66,7 @@ class Role(models.Model):
     )
 
     id = models.PositiveSmallIntegerField(choices=USER_ROLE_CHOISES, primary_key=True)
+    users = models.ManyToManyField("LannisterUser")
     name = models.CharField(
         max_length=20, choices=USER_ROLE_CHOISES, default=3
     )  # get_user_display()
@@ -89,6 +83,7 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     slack_user_id = models.CharField(max_length=100, blank=True, null=True)
+    slack_channel_id = models.CharField(max_length=100, blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     roles = models.ManyToManyField(Role)
