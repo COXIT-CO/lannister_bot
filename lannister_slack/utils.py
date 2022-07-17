@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 from lannister_auth.models import LannisterUser
 from lannister_auth.serializers import UserSerializer
-from lannister_slack.models import BonusRequest, BonusRequestStatus
+from lannister_requests.models import BonusRequest, BonusRequestStatus
 from lannister_slack.serializers import (
     BonusRequestSerializer,
     BonusRequestStatusSerializer,
