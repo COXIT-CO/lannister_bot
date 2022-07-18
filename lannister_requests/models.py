@@ -19,8 +19,7 @@ class BonusRequestStatus(models.Model):
 
 def set_request_status():
     """ Get default status """
-    default = BonusRequestStatus.objects.get_or_create(status_name="Created")
-    return default[0]
+    return BonusRequestStatus.objects.get_or_create(status_name="Created")[0]
 
 class BonusRequest(models.Model):
 
@@ -99,7 +98,7 @@ def add_status_to_history(sender, created, instance, *args, **kwargs):
     if previous and previous.status != instance.status:
         BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, updated_at=instance.updated_at)
 
-@receiver(pre_save, sender=BonusRequest)
+@receiver(pre_save, sender=LannisterUser)
 def create_roles(sender, instance, *args, **kwargs):
     BonusRequestStatus.objects.get_or_create(status_name="Created")
     BonusRequestStatus.objects.get_or_create(status_name="Approved")
