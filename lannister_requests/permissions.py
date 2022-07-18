@@ -1,11 +1,11 @@
-from rest_framework.permissions import BasePermission
+from rest_framework import permissions
 from lannister_auth.models import Role
 from lannister_requests.models import BonusRequestStatus
 
 
-class IsUserOrAdministrator(BasePermission):
+class IsUserOrAdministrator(permissions.IsAuthenticated):
     allowed_methods = ["GET", "POST", "PUT", "PATCH"]
-
+    #allow DELETE request only when status is "Created" or user is "Administrator"
     def has_object_permission(self, request, view, obj):
         if request.method in self.allowed_methods:
             return True
@@ -13,8 +13,8 @@ class IsUserOrAdministrator(BasePermission):
                Role.objects.get(name="Administrator") in request.user.roles.all()
 
 
-class IsAdministrator(BasePermission):
-    methods = ["POST", "PATCH", "DELETE"]
+class IsAdministrator(permissions.BasePermission):
+    methods = ["POST", "PUT", "PATCH", "DELETE"]
 
     def has_permission(self, request, view):
         if request.method in self.methods:
@@ -23,10 +23,8 @@ class IsAdministrator(BasePermission):
         return True
 
 
-class IsHistory(BasePermission):
-    methods = ["POST", "PUT", "PATCH", "DELETE"]
-
+class ReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.method in self.methods:
-            return False
-        return True
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return False
