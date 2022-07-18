@@ -10,12 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from lannister_roles.models import Role
 from django.dispatch import receiver
 
-"""
-NOTE: following models/managers are used for building out the skeleton
-      and should be adjusted when LAN-52 (DB schema) is finalized and agreed upon
-"""
-
-
 class BaseManager(BaseUserManager):
     def get_or_none(self, **kwargs):
         try:
@@ -59,12 +53,14 @@ def set_user_role():
     """ Get default status """
     return Role.objects.get_or_create(name="Worker")
 
+
 class LannisterUser(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=100, unique=True)
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     slack_user_id = models.CharField(max_length=100, blank=True, null=True)
+    slack_channel_id = models.CharField(max_length=100, blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     roles = models.ManyToManyField(Role, default=set_user_role)

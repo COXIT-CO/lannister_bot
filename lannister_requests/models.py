@@ -4,11 +4,6 @@ from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from lannister_auth.models import LannisterUser, Role
 
-"""
-NOTE: following models/managers are used for building out the skeleton
-      and should be adjusted when LAN-52 (DB schema) is finalized and agreed upon
-"""
-
 
 class BonusRequestStatus(models.Model):
     status_name = models.CharField(max_length=45, unique=True, null=False)
@@ -28,6 +23,7 @@ def set_request_status():
     return default[0]
 
 class BonusRequest(models.Model):
+
     class BonusRequestType(models.TextChoices):
         REFERAL = "Referral", _("Referral")
         OVERTIME = "Overtime", _("Overtime")

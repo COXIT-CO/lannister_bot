@@ -1,16 +1,6 @@
 from rest_framework.serializers import ModelSerializer
 from lannister_requests.models import BonusRequest, BonusRequestsHistory, BonusRequestStatus
 
-#
-# class BonusRequestSerializer(ModelSerializer):
-#     class Meta:
-#         model = BonusRequest
-#         fields = "__all__"
-#
-
-"""
-For per-field permissions(update method)
-"""
 
 class BonusRequestAdminSerializer(ModelSerializer):
     class Meta:
