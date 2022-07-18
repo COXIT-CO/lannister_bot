@@ -1,24 +1,27 @@
 from rest_framework import serializers
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-from lannister_requests.models import BonusRequest, BonusRequestStatus
+from lannister_requests.models import BonusRequest
+from lannister_requests.models import BonusRequestStatus
 from lannister_requests.serializers import BonusRequestAdminSerializer, BonusRequestRewieverSerializer, \
     BonusRequestBaseSerializer, FullHistorySerializer, BonusRequestStatusSerializer
 from rest_framework.permissions import IsAuthenticated
-from lannister_requests.permissions import IsUserOrAdministrator, IsAdministrator, IsHistory
+from lannister_requests.permissions import IsUserOrAdministrator, IsAdministrator, ReadOnly
 from lannister_auth.models import Role
 
 
 class BonusRequestViewSet(ModelViewSet):
-    permission_classes = (IsAuthenticated, IsUserOrAdministrator, )
+    permission_classes = (IsUserOrAdministrator, )
     queryset = BonusRequest.objects.all().order_by('creator', 'reviewer')
 
     def get_serializer_class(self):
+        # Allow different feild only on PATCH method
         if self.request.method == "PATCH":
             if self.request.user.is_superuser or self.request.user.is_staff \
                     or Role.objects.get(name="Administrator") in self.request.user.roles.all():
                 return BonusRequestAdminSerializer
             elif Role.objects.get(name="Reviewer") in self.request.user.roles.all():
                 return BonusRequestRewieverSerializer
+        # On all other methods return basic serializer
         return BonusRequestBaseSerializer
 
     def get_queryset(self):
@@ -56,7 +59,7 @@ class BonusRequestViewSet(ModelViewSet):
 
 class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
-    permission_classes = (IsAuthenticated, IsHistory)
+    permission_classes = (IsAuthenticated, ReadOnly)
     serializer_class = FullHistorySerializer
     queryset = BonusRequest.objects.all().order_by('creator', 'reviewer')
 
