@@ -30,11 +30,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "lannister_auth",
-    "lannister_slack",
+    # "lannister_slack",
     "api_workers",
-    "lannister_requests",
     "lannister_roles",
-    "workers_api",
     "lannister_requests",
     # 3rd party
     "rest_framework",
