@@ -31,7 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "lannister_auth",
     "lannister_slack",
-    "workers_api",
+    "api_workers",
     "lannister_requests",
     # 3rd party
     "rest_framework",
@@ -54,7 +54,7 @@ ROOT_URLCONF = "lannister_core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, 'templates')],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
