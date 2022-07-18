@@ -16,8 +16,9 @@ class BonusRequestStatus(models.Model):
         verbose_name = "Bonus status"
         verbose_name_plural = "Bonus statuses"
 
+
 def set_request_status():
-    """ create new statuses. Get default status """
+    """create new statuses. Get default status"""
     BonusRequestStatus.objects.get_or_create(status_name="Created")
     BonusRequestStatus.objects.get_or_create(status_name="Approved")
     BonusRequestStatus.objects.get_or_create(status_name="Rejected")
@@ -25,17 +26,18 @@ def set_request_status():
     default = BonusRequestStatus.objects.get(status_name="Created")
     return default.pk
 
+
 class BonusRequest(models.Model):
-
-
     class BonusRequestType(models.TextChoices):
         REFERAL = "Referral", _("Referral")
         OVERTIME = "Overtime", _("Overtime")
 
     creator = models.ForeignKey(LannisterUser, on_delete=models.PROTECT)
     status = models.ForeignKey(
-        "BonusRequestStatus", related_name="statuses", default=set_request_status,
-        on_delete=models.CASCADE
+        "BonusRequestStatus",
+        related_name="statuses",
+        default=set_request_status,
+        on_delete=models.CASCADE,
     )
     reviewer = models.ForeignKey(
         LannisterUser, related_name="reviewer", on_delete=models.SET_NULL, null=True
@@ -57,11 +59,7 @@ class BonusRequest(models.Model):
                 )
             )
         if self.reviewer == self.creator:
-            raise ValueError(
-                _(
-                    "You cannot review self request."
-                )
-            )
+            raise ValueError(_("You cannot review self request."))
         self.reviewer = reviewer
         super().save(*args, **kwargs)
 
@@ -78,7 +76,10 @@ class BonusRequestsHistory(models.Model):
         BonusRequest, related_name="history_requests", on_delete=models.CASCADE
     )
     status = models.ForeignKey(
-        BonusRequestStatus, related_name="history_statuses", on_delete=models.CASCADE, null=True
+        BonusRequestStatus,
+        related_name="history_statuses",
+        on_delete=models.CASCADE,
+        null=True,
     )
     updated_at = models.DateTimeField(null=True)
 
@@ -89,11 +90,23 @@ class BonusRequestsHistory(models.Model):
         db_table = "bonus_requests_history"
         verbose_name_plural = "Bonus requests history"
 
+
 @receiver(post_save, sender=BonusRequest)
 def add_status_to_history(sender, created, instance, *args, **kwargs):
     if created:
-        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
-    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-updated_at").first()
+        BonusRequestsHistory.objects.create(
+            bonus_request=instance,
+            status=instance.status,
+            updated_at=instance.updated_at,
+        )
+    previous = (
+        BonusRequestsHistory.objects.filter(bonus_request=instance.id)
+        .order_by("-updated_at")
+        .first()
+    )
     if previous and previous.status != instance.status:
-        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, updated_at=instance.updated_at)
-
+        BonusRequestsHistory.objects.create(
+            bonus_request=instance,
+            status=instance.status,
+            updated_at=instance.updated_at,
+        )

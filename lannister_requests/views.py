@@ -1,28 +1,39 @@
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from lannister_requests.models import BonusRequest, BonusRequestStatus
+
 # from lannister_slack.serializers import BonusRequestSerializer
-from lannister_requests.serializers import BonusRequestAdminSerializer, BonusRequestRewieverSerializer, \
-    BonusRequestBaseSerializer, FullHistorySerializer, BonusRequestStatusSerializer
+from lannister_requests.serializers import (
+    BonusRequestAdminSerializer,
+    BonusRequestRewieverSerializer,
+    BonusRequestBaseSerializer,
+    FullHistorySerializer,
+    BonusRequestStatusSerializer,
+)
 from rest_framework.permissions import IsAuthenticated
 from lannister_requests.permissions import IsUser
 
 
 class BonusRequestViewSet(ModelViewSet):
-    permission_classes = (IsAuthenticated, IsUser, )
+    permission_classes = (
+        IsAuthenticated,
+        IsUser,
+    )
     queryset = BonusRequest.objects.all()
 
     # serializer_class = BonusRequestSerializer
-
 
     """
     TODO: Implement better get_serializer_class
     """
     methods = ["GET", "PATCH", "DELETE"]
+
     def get_serializer_class(self):
         if self.request.method in self.methods:
             if self.request.user.is_superuser:
                 return BonusRequestAdminSerializer
-            elif self.request.user.is_staff: #mock for refactoring after getting permissions
+            elif (
+                self.request.user.is_staff
+            ):  # mock for refactoring after getting permissions
                 return BonusRequestRewieverSerializer
         return BonusRequestBaseSerializer
 
@@ -38,10 +49,10 @@ class BonusRequestViewSet(ModelViewSet):
         serializer.save(creator=self.request.user)
 
 
-
 class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
     """When get model of Roles implement permissions"""
+
     permission_classes = (IsAuthenticated,)
     serializer_class = FullHistorySerializer
     queryset = BonusRequest.objects.all()
@@ -50,8 +61,7 @@ class HistoryRequestViewSet(ReadOnlyModelViewSet):
 class BonusRequestStatusViewSet(ModelViewSet):
 
     """When get model of Role implement permissions"""
+
     permission_classes = (IsAuthenticated,)
     serializer_class = BonusRequestStatusSerializer
     queryset = BonusRequestStatus.objects.all()
-
-
