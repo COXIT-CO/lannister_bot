@@ -80,7 +80,7 @@ class BonusRequestsHistory(models.Model):
     status = models.ForeignKey(
         BonusRequestStatus, related_name="history_statuses", on_delete=models.CASCADE, null=True
     )
-    date = models.DateTimeField(null=True)
+    updated_at = models.DateTimeField(null=True)
 
     def __str__(self):
         return f"Request id: {self.bonus_request.pk}, opened by {self.bonus_request.creator}"
@@ -92,10 +92,10 @@ class BonusRequestsHistory(models.Model):
 @receiver(post_save, sender=BonusRequest)
 def add_status_to_history(sender, created, instance, *args, **kwargs):
     if created:
-        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
-    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-date").first()
+        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, updated_at=instance.updated_at)
+    previous = BonusRequestsHistory.objects.filter(bonus_request=instance.id).order_by("-updated_at").first()
     if previous and previous.status != instance.status:
-        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, date=instance.updated_at)
+        BonusRequestsHistory.objects.create(bonus_request=instance, status=instance.status, updated_at=instance.updated_at)
 
 @receiver(pre_save, sender=BonusRequest)
 def create_roles(sender, instance, *args, **kwargs):
