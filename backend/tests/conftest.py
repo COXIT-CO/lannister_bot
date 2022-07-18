@@ -1,7 +1,7 @@
 import pytest
 from mixer.backend.django import mixer
 from lannister_auth.models import LannisterUser, Role
-from lannister_slack.models import (
+from lannister_requests.models import (
     BonusRequest,
     BonusRequestStatus,
 )
