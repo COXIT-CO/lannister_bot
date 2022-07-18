@@ -48,6 +48,12 @@ class BonusRequest(models.Model):
     payment_date = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        if not self.reviewer:
+            raise ValueError(
+                _(
+                    "You must add reviewer."
+                )
+            )
         reviewer = LannisterUser.objects.get(username=self.reviewer.username)
         is_reviewer = Role.objects.get(name="Reviewer") in reviewer.roles.all()
         if not is_reviewer:
