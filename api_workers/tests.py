@@ -1,6 +1,5 @@
 from django.test import TestCase
 from lannister_auth .models import LannisterUser
-from lannister_slack .models import BonusRequest
 
 
 class LannisterUserModelTest(TestCase):
