@@ -15,6 +15,7 @@ from rest_framework.permissions import IsAuthenticated
 from lannister_requests.permissions import IsUser
 from rest_framework.response import Response
 from rest_framework import status
+import datetime
 
 
 class BonusRequestViewSet(ModelViewSet):
@@ -80,7 +81,9 @@ class BonusRequestViewSet(ModelViewSet):
                 data={"response": "Field 'price_usd' should be a decimal ie 123.00"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        deserialized_date = datetime.datetime.strptime(
+            data.get("payment_date"), "%Y-%m-%d %H:%M"
+        )
         new_bonus_request = BonusRequest.objects.create(
             status=status_name,
             creator=creator,
@@ -88,6 +91,7 @@ class BonusRequestViewSet(ModelViewSet):
             description=data.get("description"),
             bonus_type=data.get("bonus_type").capitalize(),
             price_usd=data.get("price_usd"),
+            payment_date=deserialized_date,
         )
         serializer = BonusRequestBaseSerializer(new_bonus_request)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
