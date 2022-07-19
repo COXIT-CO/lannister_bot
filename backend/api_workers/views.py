@@ -6,9 +6,15 @@ from lannister_requests.serializers import BonusRequestBaseSerializer
 from django.shortcuts import get_object_or_404
 
 
-class ListWorker(generics.ListCreateAPIView):
+class ListWorkers(generics.ListCreateAPIView):
     queryset = LannisterUser.objects.all()
     serializer_class = WorkerSerializer
+
+    def get_queryset(self):
+        # very stupid way of getting optional url, refactor it later with smarter drf tools
+        if self.kwargs.get("reviewers"):
+            return LannisterUser.objects.filter(roles__in=[2])
+        return self.queryset.all()
 
 
 class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
