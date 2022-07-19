@@ -1,4 +1,7 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import (
+    ModelSerializer,
+    SerializerMethodField,
+)
 from lannister_requests.models import (
     BonusRequest,
     BonusRequestsHistory,
@@ -30,6 +33,8 @@ class BonusRequestRewieverSerializer(ModelSerializer):
 
 
 class BonusRequestBaseSerializer(ModelSerializer):
+    status = SerializerMethodField()
+
     class Meta:
         model = BonusRequest
         fields = "__all__"
@@ -40,6 +45,9 @@ class BonusRequestBaseSerializer(ModelSerializer):
             "price_usd",
             "payment_date",
         )
+
+    def get_status(self, obj):
+        return obj.status.status_name
 
 
 class BonusRequestHistorySerializer(ModelSerializer):
@@ -75,3 +83,15 @@ class BonusRequestStatusSerializer(ModelSerializer):
     class Meta:
         model = BonusRequestStatus
         fields = "__all__"
+
+
+class BonusTypeSerializer(ModelSerializer):
+    bonus_type = SerializerMethodField()
+
+    class Meta:
+        fields = ["bonus_type"]
+        model = BonusRequest
+
+    def get_bonus_type(self, obj):
+        print(obj)
+        return obj  # bonus type returns tuple for some reason
