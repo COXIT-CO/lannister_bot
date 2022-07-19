@@ -1,10 +1,18 @@
 from django.urls import path
-from .views import ListWorker, DetailWorker, ListWorkerRequest, DetailWorkerRequest
+from .views import (
+    ListWorkers,
+    DetailWorker,
+    ListWorkerRequest,
+    DetailWorkerRequest,
+)
 
 urlpatterns = [
-    path("", ListWorker.as_view()),
-    path("<int:pk>/", DetailWorker.as_view()),
-    path("<str:username>/", DetailWorker.as_view()),
+    # viewset-like url mapping,
+    # 'workers/' should've been renamed in root to distinguish whether url is returning single object or collection
+    path("list/", ListWorkers.as_view()),
+    path("list/<str:reviewers>/", ListWorkers.as_view()),
+    path("detail/<int:pk>/", DetailWorker.as_view()),
+    path("detail/<str:username>/", DetailWorker.as_view()),
     path("request/", ListWorkerRequest.as_view()),
     path("request/<int:pk>/", DetailWorkerRequest.as_view()),
 ]
