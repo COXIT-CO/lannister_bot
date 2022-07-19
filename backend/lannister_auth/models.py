@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import pre_save
 from django.utils.translation import gettext_lazy as _
 
+
 class BaseManager(BaseUserManager):
     def get_or_none(self, **kwargs):
         try:
@@ -18,7 +19,7 @@ class BaseManager(BaseUserManager):
 
 class LannisterUserManager(BaseManager):
     def create_user(
-            self, email, username, password, first_name, last_name, **other_fields
+        self, email, username, password, first_name, last_name, **other_fields
     ):
         if not username:
             raise ValueError(_("Please provide username"))
@@ -38,7 +39,7 @@ class LannisterUserManager(BaseManager):
         return user
 
     def create_superuser(
-            self, email, username, password, first_name, last_name, **other_fields
+        self, email, username, password, first_name, last_name, **other_fields
     ):
         user = self.create_user(email, username, password, first_name, last_name)
         user.is_superuser = True
@@ -67,11 +68,7 @@ class Role(models.Model):
 
     id = models.PositiveSmallIntegerField(choices=USER_ROLE_CHOISES, primary_key=True)
     users = models.ManyToManyField("LannisterUser")
-    name = models.CharField(
-        max_length=20, choices=USER_ROLE_CHOISES, default=3
-    )  # get_user_display()
     description = models.CharField(max_length=128, null=True)
-    users = models.ManyToManyField("LannisterUser", related_name="users")
 
     def __str__(self):
         return self.get_id_display()
