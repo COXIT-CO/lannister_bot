@@ -34,6 +34,8 @@ class BonusRequestRewieverSerializer(ModelSerializer):
 
 class BonusRequestBaseSerializer(ModelSerializer):
     status = SerializerMethodField()
+    creator = SerializerMethodField()
+    reviewer = SerializerMethodField()
 
     class Meta:
         model = BonusRequest
@@ -48,6 +50,14 @@ class BonusRequestBaseSerializer(ModelSerializer):
 
     def get_status(self, obj):
         return obj.status.status_name
+
+    def get_creator(self, obj):
+        return obj.creator.username
+
+    def get_reviewer(self, obj):
+        if not obj.reviewer:
+            return None
+        return obj.reviewer.username
 
 
 class BonusRequestHistorySerializer(ModelSerializer):
