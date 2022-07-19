@@ -16,12 +16,13 @@ class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WorkerSerializer
 
     def get_object(self, *args, **kwargs):
+        """
+        Parsing object by model id or slack_channel_id
+        """
         if self.kwargs.get("pk"):
             return get_object_or_404(LannisterUser, id=self.kwargs.get("pk"))
 
-        return get_object_or_404(
-            LannisterUser, slack_channel_id=self.kwargs.get("slack_channel_id")
-        )
+        return get_object_or_404(LannisterUser, username=self.kwargs.get("username"))
 
 
 class ListWorkerRequest(generics.ListCreateAPIView):
