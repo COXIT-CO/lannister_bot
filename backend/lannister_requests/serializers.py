@@ -80,6 +80,7 @@ class BonusRequestHistorySerializer(ModelSerializer):
 
 class FullHistorySerializer(ModelSerializer):
     history_requests = BonusRequestHistorySerializer(many=True, read_only=True)
+    creator = SerializerMethodField()
 
     class Meta:
         model = BonusRequest
@@ -92,6 +93,9 @@ class FullHistorySerializer(ModelSerializer):
             "payment_date",
             "history_requests",
         ]
+
+    def get_creator(self, obj):
+        return obj.creator.username
 
 
 class BonusRequestStatusSerializer(ModelSerializer):
