@@ -135,7 +135,7 @@ class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
     """When get model of Roles implement permissions"""
 
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsUser,)
     serializer_class = FullHistorySerializer
     queryset = BonusRequest.objects.all()
 
