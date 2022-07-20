@@ -1,11 +1,15 @@
 import copy
 import json
 from datetime import datetime, timedelta
+from pprint import pprint
 
 import requests
 
 from .views import slack_client
 from django.conf import settings
+
+BASE_BACKEND_URL = settings.BASE_BACKEND_URL
+FRONTEND_HEADER = settings.CUSTOM_FRONTEND_HEADER
 
 
 def prettify_json(data):
@@ -49,8 +53,10 @@ def get_all_bonus_request_statuses():
     return statuses
 
 
-def schedule_message_notification(channel, username, collection, timestamp):
-    ts_to_epoch = timestamp.strftime("%s")
+def schedule_message_notification(channel, username, collection, timestamp: str):
+    timestamp_to_datetime = datetime.strptime(timestamp, "%d-%m-%Y %H:%M %Z")
+    # localtime = timezone.localtime(timestamp_to_datetime)
+    ts_to_epoch = timestamp_to_datetime.strftime("%s")
     bot_message = BotMessage(
         channel=channel, username=username, collection=collection, queryset=ts_to_epoch
     )
@@ -593,7 +599,10 @@ class ModalMessage(BotMessage):
             self.divider
         )  # very dangerous workaround to find channel id in triggered modal, rework if possible
         divider_with_channel_id["block_id"] = self.channel
-        bonus_types = get_all_bonus_types()
+        # bonus_types = get_all_bonus_types()
+        bonus_types = requests.get(
+            url=BASE_BACKEND_URL + "requests/bonus-types/", headers=FRONTEND_HEADER
+        ).json()
         self.dropdown_in_modal["label"]["text"] = "Edit bonus type"
         self.dropdown_in_modal["element"][
             "action_id"
@@ -601,9 +610,10 @@ class ModalMessage(BotMessage):
         self.dropdown_in_modal["block_id"] = "edit_request_bonus_type_selected"
 
         options = []
+        print(bonus_types)
         for index, bonus_type in enumerate(bonus_types):
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = bonus_type
+            option["text"]["text"] = bonus_type["bonus_type"]["bonus_type"]
             option["value"] = f"value-{index}"
             options.append(option)
         self.dropdown_in_modal["element"]["options"] = options
@@ -754,17 +764,13 @@ class MessageWithDropdowns(BotMessage):
         return reviewer_section
 
     def show_bonus_requests_by_user(self):
-        bonus_requests = []
         dropdown_choices = []
-        for item in self.collection:
-            serialized_bonus_request_by_user = BonusRequestSerializer(item).data
-            bonus_requests.append(serialized_bonus_request_by_user)
-
-        for index, bonus_request in enumerate(bonus_requests):
+        pprint(self.collection)
+        for index, bonus_request in enumerate(self.collection):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']['status_name']}"
+            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']}"
             option["value"] = f"value-{index}"
             dropdown_choices.append(option)
         self.header["text"]["text"] = "Select bonus request to edit"
