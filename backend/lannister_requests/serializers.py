@@ -112,5 +112,4 @@ class BonusTypeSerializer(ModelSerializer):
         model = BonusRequest
 
     def get_bonus_type(self, obj):
-        print(obj)
-        return obj  # bonus type returns tuple for some reason
+        return obj
