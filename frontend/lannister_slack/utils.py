@@ -24,33 +24,11 @@ def prettify_json(data):
 def list_requests_message_constructor(collection):
     return f"*Request id: {collection['id']}*\n \
 *Status: {collection['status']}*\n \
-*Reviewer: {collection.get('reviewer').get('username') if collection.get('reviewer') else 'Unassigned'}*\n \
+*Reviewer: {collection.get('reviewer') if collection.get('reviewer') else 'Unassigned'}*\n \
 - Request description: {collection['description']}\n \
 - Request created at: {collection['created_at']}\n \
 - Request last updated at: {collection['updated_at']}\n \
 - Payment date: {collection['payment_date']}\n"
-
-
-def get_all_reviewers():
-    reviewers_qs = LannisterUser.objects.filter(roles__in=[2])
-    reviewers = [UserSerializer(reviewer).data for reviewer in reviewers_qs]
-    return reviewers
-
-
-def get_all_bonus_types():
-    bonus_requests = BonusRequest.bonus_type.field.choices  # returns list of tuples
-    bonus_types = set([choice[0] for choice in bonus_requests])
-    return bonus_types
-
-
-def get_all_bonus_request_statuses():
-    status_choises = BonusRequestStatus.objects.all()
-    statuses = [
-        BonusRequestStatusSerializer(choice).data["status_name"]
-        for choice in status_choises
-    ]
-    print(statuses)
-    return statuses
 
 
 def schedule_message_notification(channel, username, collection, timestamp: str):
@@ -439,16 +417,12 @@ class BotMessage:
 
     def list_reviewable_requests_by_current_reviewer(self):
         self.header["text"]["text"] = "Assigned bonus request tickets to me"
-        serialized_tickets = [
-            BonusRequestSerializer(item).data for item in self.collection
-        ]
-        print(serialized_tickets)
         self.response["blocks"] = [self.divider, self.header]
-        for ticket in serialized_tickets:
+        for ticket in self.collection:
             ticket_data = copy.deepcopy(self.body)
             ticket_data["text"][
                 "text"
-            ] = f"Ticket id: *#{ticket['id']}*\nSubmitted by: *{ticket['creator']['username']}*\nStatus: *{ticket['status']['status_name']}*\nPayment date: *{ticket['payment_date']}*\nDescription: *{ticket['description']}*\nLast time updated at: *{ticket['updated_at']}*"
+            ] = f"Ticket id: *#{ticket['id']}*\nSubmitted by: *{ticket['creator']}*\nStatus: *{ticket['status']}*\nPayment date: *{ticket['payment_date']}*\nDescription: *{ticket['description']}*\nLast time updated at: *{ticket['updated_at']}*"
             self.response["blocks"].append(ticket_data)
 
         print(prettify_json(self.response))
