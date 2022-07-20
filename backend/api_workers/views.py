@@ -1,5 +1,6 @@
-from rest_framework import generics
-from lannister_auth.models import LannisterUser
+from rest_framework import generics, status
+from rest_framework.response import Response
+from lannister_auth.models import LannisterUser, Role
 from lannister_requests.models import BonusRequest
 from .serializers import WorkerSerializer
 from lannister_requests.serializers import BonusRequestBaseSerializer
@@ -29,6 +30,20 @@ class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
             return get_object_or_404(LannisterUser, id=self.kwargs.get("pk"))
 
         return get_object_or_404(LannisterUser, username=self.kwargs.get("username"))
+
+    def patch(self, request, *args, **kwargs):
+        """
+        TODO: Lock PATCH method under permission for admin only
+        Pass integer as role
+        """
+        data = request.data
+        user = LannisterUser.objects.get(username=self.kwargs.get("username"))
+        provided_role = Role.objects.get(id=data.get("role"))
+        user.roles.remove(provided_role)
+        return Response(
+            data={"response": "User was unassigned successfully"},
+            status=status.HTTP_200_OK,
+        )
 
 
 class ListWorkerRequest(generics.ListCreateAPIView):
