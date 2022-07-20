@@ -6,21 +6,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
-from rest_framework.viewsets import ModelViewSet
 from lannister_slack.slack_client import slack_client
-
-# from lannister_requests.models import (
-#     BonusRequest,
-#     BonusRequestStatus,
-#     BonusRequestsHistory,
-# )
-# from lannister_slack.serializers import BonusRequestSerializer
 from lannister_slack.utils import (
     prettify_json,
     BotMessage,
     ModalMessage,
     MessageWithDropdowns,
-    get_all_bonus_request_statuses,
+    # get_all_bonus_request_statuses,
     schedule_message_notification,
 )
 from lannister_slack.permissions import (
@@ -30,7 +22,6 @@ from lannister_slack.permissions import (
 
 # from lannister_auth.models import LannisterUser, Role
 from slack_sdk.errors import SlackApiError
-from django.utils import timezone
 from django.conf import settings
 
 
@@ -45,7 +36,6 @@ def respond_to_challenge(request):
 BOT_ID = slack_client.api_call("auth.test")["user_id"]
 # flag to check if user filled all required input fields (if there is multiple of them) before sending new command
 HANGING_INPUT_FIELD = False
-# BASE_BACKEND_URL = "http://127.0.0.1:8001/api/"
 BASE_BACKEND_URL = settings.BASE_BACKEND_URL
 FRONTEND_HEADER = settings.CUSTOM_FRONTEND_HEADER
 
@@ -276,13 +266,6 @@ class InteractivesHandler(APIView):
                     loads.get("view").get("blocks")[0].get("block_id")
                 )  # see comment in utils.py modal_on_bonus_request_edit() method
                 bot_message = BotMessage(channel=channel_id, username=username)
-
-                # bonus_request = BonusRequest.objects.get(id=request_id)
-                # print(f"applied tz: {timezone.localtime(bonus_request.payment_date)}")
-                # created_status = BonusRequestStatus.objects.get(status_name="Created")
-                # request_in_history = BonusRequestsHistory.objects.filter(
-                #     bonus_request=bonus_request
-                # ).first()
                 bonus_request_current_status = requests.get(
                     url=BASE_BACKEND_URL + "requests/" + request_id,
                     headers=FRONTEND_HEADER,
@@ -341,9 +324,9 @@ class InteractivesHandler(APIView):
         #             return Response(status=status.HTTP_200_OK)
 
         if event_type == "block_actions":
-            #             """
-            #             Handles user's choices from dropdowns/actions with clicking buttons etc.
-            #             """
+            """
+            Handles user's choices from dropdowns/actions with clicking buttons etc.
+            """
 
             action_id = loads.get("actions")[0].get(
                 "action_id"
@@ -390,6 +373,14 @@ class InteractivesHandler(APIView):
                                     "*Reviewer assigned successfully.*\n"
                                 )
                             )
+                        else:
+                            slack_client.chat_postMessage(
+                                **bot_message.base_styled_message(
+                                    "*You cannot assign bonus request review to yourself.*\n"
+                                )
+                            )
+                            return Response(status=status.HTTP_200_OK)
+
                         get_reviewers_channel_id = requests.get(
                             url=BASE_BACKEND_URL
                             + f"workers/detail/{selected_reviewer_username}",
@@ -600,6 +591,7 @@ class InteractivesHandler(APIView):
                     )
                 )
                 return Response(status=status.HTTP_200_OK)
+
             bot_message = BotMessage(
                 channel=loads.get("channel").get("id"), username=username
             )
@@ -608,21 +600,32 @@ class InteractivesHandler(APIView):
             )
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        #             if action_id.startswith("reject"):
-        #                 request_id = action_id.split("_")[-1]
-        #                 bonus_request = BonusRequest.objects.get(id=request_id)
-        #                 status_obj = BonusRequestStatus.objects.get(status_name="Approved")
-        #                 bonus_request.status = status_obj
-        #                 bonus_request.save()
-        #                 bot_message = BotMessage(
-        #                     channel=loads.get("channel").get("id"), username=username
-        #                 )
-        #                 slack_client.chat_postMessage(
-        #                     **bot_message.base_styled_message(
-        #                         "*Bonus request rejected ❌ successfully*"
-        #                     )
-        #                 )
-        #                 return Response(status=status.HTTP_200_OK)
+        if action_id.startswith("reject"):
+            request_id = action_id.split("_")[-1]
+            find_request_to_reject = requests.patch(
+                BASE_BACKEND_URL + f"requests/{request_id}",
+                json={"status": "Rejected"},
+                headers=FRONTEND_HEADER,
+            )
+            bot_message = BotMessage(
+                channel=loads.get("channel").get("id"), username=username
+            )
+            if find_request_to_reject.status_code == 200:
+
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*Bonus request rejected ❌ successfully*"
+                    )
+                )
+                return Response(status=status.HTTP_200_OK)
+
+            bot_message = BotMessage(
+                channel=loads.get("channel").get("id"), username=username
+            )
+            slack_client.chat_postMessage(
+                **bot_message.base_styled_message("*Bonus request not found 💀*")
+            )
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
         if action_id.startswith("history"):
             if len(loads.get("actions")[0]["selected_options"]) == 0:
@@ -682,7 +685,7 @@ class RegisterUserCommandView(APIView):
         channel_id = request.data.get("channel_id", None)
         # user = LannisterUser.objects.get(username=username)
         user_data = requests.get(
-            settings.BASE_BACKEND_URL + f"workers/{username}"
+            settings.BASE_BACKEND_URL + f"workers/detail/{username}"
         ).json()
         bot_message = BotMessage(channel_id, username)
         if user_data.get("slack_user_id") and user_data.get("slack_channel_id"):
@@ -945,22 +948,25 @@ class ListReviewableRequests(APIView):
     def post(self, request):
         channel_id = request.data.get("channel_id")
         username = request.data.get("user_name")
-        # is_reviewer = (
-        #     Role.objects.get(id=2)
-        #     in LannisterUser.objects.get(username=username).roles.all()
-        # )
-        # if is_reviewer:
-        #     reviewable_tickets = BonusRequest.objects.filter(
-        #         reviewer__username=username
-        #     )
-        #     bot_message = BotMessage(
-        #         channel=channel_id, username=username, collection=reviewable_tickets
-        #     )
-        #     slack_client.chat_postMessage(
-        #         **bot_message.list_reviewable_requests_by_current_reviewer()
-        #     )
-        #     return Response(status=status.HTTP_200_OK)
+        reviewer = requests.get(
+            url=BASE_BACKEND_URL + f"workers/detail/{username}", headers=FRONTEND_HEADER
+        ).json()
+        reviewer_data = {"name": "Reviewer"}
+        if reviewer_data in reviewer.get("roles"):
+            all_reviewable_bonus_requests = requests.get(
+                url=BASE_BACKEND_URL + f"requests/?reviewer={username}&reviewable=true",
+                headers=FRONTEND_HEADER,
+            ).json()
+            bot_message = BotMessage(
+                channel=channel_id,
+                username=username,
+                collection=all_reviewable_bonus_requests,
+            )
+            slack_client.chat_postMessage(
+                **bot_message.list_reviewable_requests_by_current_reviewer()
+            )
+            return Response(status=status.HTTP_200_OK)
 
-        # bot_message = BotMessage(channel=channel_id, username=username)
-        # slack_client.chat_postMessage(**bot_message.access_denied())
-        # return Response(status=status.HTTP_403_FORBIDDEN)
+        bot_message = BotMessage(channel=channel_id, username=username)
+        slack_client.chat_postMessage(**bot_message.access_denied())
+        return Response(status=status.HTTP_403_FORBIDDEN)
