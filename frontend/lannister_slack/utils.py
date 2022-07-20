@@ -310,15 +310,16 @@ class BotMessage:
         return self.response
 
     def list_users(self):
-        users = LannisterUser.objects.all()
-        serialized_users = [UserSerializer(user).data for user in users]
+        list_all_users = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/", headers=FRONTEND_HEADER
+        ).json()
         self.header["text"]["text"] = "List of users and their roles"
         self.response["blocks"] = [self.divider, self.header, self.divider]
-        for user in serialized_users:
+        for user in list_all_users:
             users_data = copy.deepcopy(self.body)
             users_data["text"][
                 "text"
-            ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*"
+            ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*\nRoles: *{', '.join([item['name'] for item in user['roles']])}*"
             self.response["blocks"].append(users_data)
         print(prettify_json(self.response))
         return self.response
@@ -390,37 +391,30 @@ class BotMessage:
         return self.response
 
     def history_static_output(self):
-        self.header["text"]["text"] = f"#{self.collection.id} request history"
-        serialize_bonus_request = BonusRequestSerializer(self.collection)
+        self.header["text"]["text"] = f"#{self.collection['id']} request history"
         ticket_creator = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
-        ticket_creator[
-            "text"
-        ] = f'By: {serialize_bonus_request.data.get("creator").get("username")}'
+        ticket_creator["text"] = f'By: {self.collection.get("creator")}'
         bonus_type = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        bonus_type[
-            "text"
-        ] = f'Bonus type: *{serialize_bonus_request.data.get("bonus_type")}*'
+        bonus_type["text"] = f'Bonus type: *{self.collection.get("bonus_type")}*'
         requested_reward_in_usd = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
         requested_reward_in_usd[
             "text"
-        ] = f'Requested reward amount: ${serialize_bonus_request.data.get("price_usd")}'
+        ] = f'Requested reward amount: ${self.collection.get("price_usd")}'
         description = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        description[
-            "text"
-        ] = f'Description: *{serialize_bonus_request.data.get("description")}*'
+        description["text"] = f'Description: *{self.collection.get("description")}*'
         payment_date = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
         payment_date[
             "text"
-        ] = f'Requested payment date: *{serialize_bonus_request.data.get("payment_date")}*'
+        ] = f'Requested payment date: *{self.collection.get("payment_date")}*'
         statuses = []
-        serialized_history = [BonusRequestHistory(item).data for item in self.queryset]
-        for item in serialized_history:  # grab status and updated_at
-            print(item)
-            history_display = f'Status: {item["status"]["status_name"]}, last updated at: {item["updated_at"]}'
+        for item in self.collection.get("history_requests"):
+            history_display = (
+                f'Status: {item["status"]}, last updated at: {item["updated_at"]}'
+            )
             statuses.append(history_display)
 
         self.multiple_horizontal_text_elements["fields"] = [
@@ -877,23 +871,23 @@ class MessageWithDropdowns(BotMessage):
         self.multi_static_select["label"][
             "text"
         ] = "Select bonus request to see its history of statuses"
-        bonus_requests = BonusRequest.objects.all()
+        # bonus_requests = BonusRequest.objects.all()
+        bonus_requests = requests.get(
+            url=BASE_BACKEND_URL + "requests/", headers=FRONTEND_HEADER
+        ).json()
+        print(prettify_json(bonus_requests))
         if len(bonus_requests) == 0:
             self.body["text"][
                 "text"
             ] = "*No bonus requests were created.\n/new-request to add some*"
             self.response["blocks"] = [self.divider, self.body, self.divider]
             return self.response
-
-        serialized_requests = [
-            BonusRequestSerializer(item).data for item in bonus_requests
-        ]
         options = []
-        for index, request in enumerate(serialized_requests):
+        for index, request in enumerate(bonus_requests):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"{request['creator']['username']}'s {request['bonus_type']} request #{request['id']} for ${request['price_usd']}"
+            ] = f"{request['creator']}'s {request['bonus_type']} request #{request['id']} for ${request['price_usd']}"
             option["value"] = f"value-{index}"
             options.append(option)
 

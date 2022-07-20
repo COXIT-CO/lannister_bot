@@ -608,60 +608,56 @@ class InteractivesHandler(APIView):
             )
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        #             if action_id.startswith("reject"):
+        #                 request_id = action_id.split("_")[-1]
+        #                 bonus_request = BonusRequest.objects.get(id=request_id)
+        #                 status_obj = BonusRequestStatus.objects.get(status_name="Approved")
+        #                 bonus_request.status = status_obj
+        #                 bonus_request.save()
+        #                 bot_message = BotMessage(
+        #                     channel=loads.get("channel").get("id"), username=username
+        #                 )
+        #                 slack_client.chat_postMessage(
+        #                     **bot_message.base_styled_message(
+        #                         "*Bonus request rejected ❌ successfully*"
+        #                     )
+        #                 )
+        #                 return Response(status=status.HTTP_200_OK)
 
-#             if action_id.startswith("reject"):
-#                 request_id = action_id.split("_")[-1]
-#                 bonus_request = BonusRequest.objects.get(id=request_id)
-#                 status_obj = BonusRequestStatus.objects.get(status_name="Approved")
-#                 bonus_request.status = status_obj
-#                 bonus_request.save()
-#                 bot_message = BotMessage(
-#                     channel=loads.get("channel").get("id"), username=username
-#                 )
-#                 slack_client.chat_postMessage(
-#                     **bot_message.base_styled_message(
-#                         "*Bonus request rejected ❌ successfully*"
-#                     )
-#                 )
-#                 return Response(status=status.HTTP_200_OK)
+        if action_id.startswith("history"):
+            if len(loads.get("actions")[0]["selected_options"]) == 0:
+                bot_message = BotMessage(channel_id, username)
+                slack_client.chat_postMessage(
+                    **bot_message.base_styled_message(
+                        "*You haven't selected anything, try agane*\nDEBUG: this multiple fields thing is clunky af"
+                    )
+                )
+            # in this case id is in the string near '#' symbol
+            pattern = r"\s#[0-9]+\s"
+            history_of_selected_requests = []
+            for item in loads.get("actions")[0][
+                "selected_options"
+            ]:  # this input field on frontend supports selection of multiple bonus requests, so loop through them
+                selected_request_id = re.findall(pattern, item["text"]["text"])[
+                    0
+                ].strip()[1:]
+                # request = BonusRequest.objects.get(id=int(selected_request_id))
+                history_of_selected_bonus_request = requests.get(
+                    url=BASE_BACKEND_URL + f"requests/history/{selected_request_id}",
+                    headers=FRONTEND_HEADER,
+                ).json()
+                history_of_selected_requests.append(history_of_selected_bonus_request)
 
-#             if action_id.startswith("history"):
-#                 if len(loads.get("actions")[0]["selected_options"]) == 0:
-#                     bot_message = BotMessage(channel_id, username)
-#                     slack_client.chat_postMessage(
-#                         **bot_message.base_styled_message(
-#                             "*You haven't selected anything, try agane*\nDEBUG: this multiple fields thing is clunky af"
-#                         )
-#                     )
-#                 # in this case id is in the string near '#' symbol
-#                 pattern = r"\s#[0-9]+\s"
-#                 requests = []
-#                 for item in loads.get("actions")[0]["selected_options"]:
-#                     selected_request_id = re.findall(pattern, item["text"]["text"])[
-#                         0
-#                     ].strip()[1:]
-#                     request = BonusRequest.objects.get(id=int(selected_request_id))
-#                     requests.append(request)
+            for element in history_of_selected_requests:
+                bot_message = BotMessage(
+                    channel=channel_id,
+                    username=username,
+                    collection=element,
+                )
+                slack_client.chat_postMessage(**bot_message.history_static_output())
+            # pass key from history as collection to botmessage, bonusrequesthistory queryset as queryset param
+            return Response(status=status.HTTP_200_OK)
 
-#                 # we have to either sort 'requests' array by history id, or just divide it in dict with saving current ordering
-#                 # key in history dict = bonus request object, value -> queryset with history of changes
-#                 history = {key: None for key in requests}
-#                 for idx, request in enumerate(requests):
-#                     history_obj = BonusRequestsHistory.objects.filter(
-#                         bonus_request__id=request.id
-#                     )
-#                     history[requests[idx]] = history_obj
-#                 print(history)
-#                 for key, value in history.items():
-#                     bot_message = BotMessage(
-#                         channel=channel_id,
-#                         username=username,
-#                         collection=key,
-#                         queryset=value,
-#                     )
-#                     slack_client.chat_postMessage(**bot_message.history_static_output())
-#                 # pass key from history as collection to botmessage, bonusrequesthistory queryset as queryset param
-#                 return Response(status=status.HTTP_200_OK)
 
 #         return Response(status=status.HTTP_200_OK)
 
@@ -907,34 +903,40 @@ class ListUsersCommandView(APIView):
         print(prettify_json(request.data))
         channel_id = request.data.get("channel_id")
         username = request.data.get("user_name")
-        # requesting_user = LannisterUser.objects.get(username=username)
-        # is_admin = requesting_user.is_superuser
-        # message = BotMessage(channel=channel_id, username=username)
 
-        # if is_admin:
-        #     slack_client.chat_postMessage(**message.list_users())
-        #     return Response(status=status.HTTP_200_OK)
+        get_current_user = requests.get(
+            url=BASE_BACKEND_URL + f"workers/detail/{username}", headers=FRONTEND_HEADER
+        ).json()
+        message = BotMessage(channel=channel_id, username=username)
 
-        # slack_client.chat_postMessage(**message.access_denied())
-        # return Response(status=status.HTTP_403_FORBIDDEN)
+        if {"name": "Administrator"} in get_current_user.get("roles"):
+            slack_client.chat_postMessage(**message.list_users())
+            return Response(status=status.HTTP_200_OK)
+
+        slack_client.chat_postMessage(**message.access_denied())
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 
-class BonusRequestStatusChangeHistoryView(APIView):
+class BonusRequestHistoryView(APIView):
     permission_classes = (IsMemberOfSlackWorkspace,)
 
     def post(self, request):
         print(prettify_json(request.data))
         channel_id = request.data.get("channel_id")
         username = request.data.get("user_name")
-        # is_admin = LannisterUser.objects.get(username=username).is_superuser
-        # if is_admin:
-        #     bot_message = MessageWithDropdowns(channel=channel_id, username=username)
-        #     slack_client.chat_postMessage(**bot_message.history_dropdown())
-        #     return Response(status=status.HTTP_200_OK)
+        admin_role = {"name": "Administrator"}
+        current_user_role = requests.get(
+            url=BASE_BACKEND_URL + f"workers/detail/{username}"
+        ).json()
+        print(current_user_role)
+        if admin_role in current_user_role.get("roles"):
+            bot_message = MessageWithDropdowns(channel=channel_id, username=username)
+            slack_client.chat_postMessage(**bot_message.history_dropdown())
+            return Response(status=status.HTTP_200_OK)
 
-        # bot_message = BotMessage(channel=channel_id, username=username)
-        # slack_client.chat_postMessage(**bot_message.access_denied())
-        # return Response(status=status.HTTP_403_FORBIDDEN)
+        bot_message = BotMessage(channel=channel_id, username=username)
+        slack_client.chat_postMessage(**bot_message.access_denied())
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 
 class ListReviewableRequests(APIView):
