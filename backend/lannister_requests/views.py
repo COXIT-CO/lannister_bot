@@ -50,6 +50,12 @@ class BonusRequestViewSet(ModelViewSet):
                 creator__username=self.request.query_params.get("user")
             )
             return queryset
+
+        if self.request.query_params.get("reviewer"):
+            queryset = self.queryset.filter(
+                reviewer__username=self.request.query_params.get("reviewer")
+            )
+            return queryset
         return self.queryset
 
     # def perform_create(self, serializer):
@@ -96,6 +102,34 @@ class BonusRequestViewSet(ModelViewSet):
         serializer = BonusRequestBaseSerializer(new_bonus_request)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    def partial_update(self, request, pk=None):
+        print(request.data)
+        """
+        Handles single status update
+        or single reviewer role removal
+        Needs refactoring
+        """
+        provided_bonus_request_to_patch = BonusRequest.objects.get(pk=pk)
+        if request.data.get("status"):
+            ticket_status = BonusRequestStatus.objects.get(
+                status_name=request.data.get("status")
+            )
+            provided_bonus_request_to_patch.status = ticket_status
+            provided_bonus_request_to_patch.save()
+            serializer = BonusRequestBaseSerializer(provided_bonus_request_to_patch)
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+        if request.data.get("reviewer"):
+            provided_reviewer_to_patch = LannisterUser.objects.get(
+                username=request.data.get("reviewer")
+            )
+            reviewer_role = Role.objects.get(id=2)
+            if reviewer_role in provided_reviewer_to_patch.roles.all():
+                provided_bonus_request_to_patch.reviewer = provided_reviewer_to_patch
+                provided_bonus_request_to_patch.save()
+                serializer = BonusRequestBaseSerializer(provided_bonus_request_to_patch)
+                return Response(data=serializer.data, status=status.HTTP_200_OK)
+
 
 class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
@@ -110,7 +144,7 @@ class BonusRequestStatusViewSet(ModelViewSet):
 
     """When get model of Role implement permissions"""
 
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsUser,)
     serializer_class = BonusRequestStatusSerializer
     queryset = BonusRequestStatus.objects.all()
 
