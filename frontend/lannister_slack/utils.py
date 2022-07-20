@@ -674,8 +674,8 @@ class ModalMessage(BotMessage):
 
         # reviewers = get_all_reviewers()
         reviewers = requests.get(
-            url=settings.BASE_BACKEND_URL + "workers/list/reviewers",
-            headers={"X-Slack-Frontend": "slack-frontend-header"},
+            url=BASE_BACKEND_URL + "workers/list/reviewers",
+            headers=FRONTEND_HEADER,
         ).json()
         reviewers_dropdown["label"]["text"] = "Select a reviewer"
         reviewers_dropdown["element"][
@@ -720,15 +720,16 @@ class MessageWithDropdowns(BotMessage):
         self.body["text"]["text"] = "Select bonus request:"
 
         options = []
-        serialized_requests = []
-        for bonus_request in self.queryset:
-            serialized_request = BonusRequestSerializer(bonus_request).data
-            serialized_requests.append(serialized_request)
-        for index, request in enumerate(serialized_requests):
+        bonus_requests_of_current_user = requests.get(
+            url=BASE_BACKEND_URL + f"requests/?user={self.username}",
+            headers=FRONTEND_HEADER,
+        ).json()
+
+        for index, request in enumerate(bonus_requests_of_current_user):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"id: {request['id']} {request['bonus_type']} by: {request['creator']['username']} at {request['created_at']}"
+            ] = f"id: {request['id']} {request['bonus_type']} by: {request['creator']} at {request['created_at']}"
             option["value"] = f"value-{index}"
             options.append(option)
 
@@ -749,11 +750,14 @@ class MessageWithDropdowns(BotMessage):
         accessory_reviewers = copy.deepcopy(self.accessory)
         accessory_reviewers["action_id"] = "select_reviewer"
         accessory_reviewers["placeholder"]["text"] = "Enter reviewer's name"
-        reviewers = get_all_reviewers()
+        # reviewers = get_all_reviewers()
+        available_reviewers = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/reviewers/", headers=FRONTEND_HEADER
+        ).json()
         options_reviewers = []
-        for index, item in enumerate(reviewers):
+        for index, reviewer in enumerate(available_reviewers):
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = f"{item['username']}"
+            option["text"]["text"] = f"{reviewer['username']}"
             option["value"] = f"value-{index}"
             options_reviewers.append(option)
         accessory_reviewers["options"] = options_reviewers
@@ -797,7 +801,9 @@ class MessageWithDropdowns(BotMessage):
         self.button["block_id"] = "confirm_unassign"
         self.button["elements"][0]["action_id"] = "confirm_unassign"
         self.button["elements"][0]["text"]["text"] = "Confirm unassign"
-        reviewers = get_all_reviewers()
+        reviewers = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/reviewers", headers=FRONTEND_HEADER
+        ).json()
         dropdown_choices = []
         for index, reviewer in enumerate(reviewers):
             option = copy.deepcopy(self.option)
@@ -816,32 +822,34 @@ class MessageWithDropdowns(BotMessage):
         self.body["text"]["text"] = "Select request to review"
         requests_selection = copy.deepcopy(self.accessory)
         requests_selection["action_id"] = "select_request_to_review"
-        not_reviewed_requests_qs = BonusRequest.objects.filter(
-            status__status_name="Created"
-        )
-        not_reviewed_requests = [
-            BonusRequestSerializer(item).data for item in not_reviewed_requests_qs
-        ]
+        available_to_review_requests = requests.get(
+            url=BASE_BACKEND_URL + f"requests/?reviewer={self.username}",
+            headers=FRONTEND_HEADER,
+        ).json()
+        print(available_to_review_requests)
         options = []
-        for index, item in enumerate(not_reviewed_requests):
+        for index, item in enumerate(available_to_review_requests):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"id: {item['id']} by {item['creator']['username']}. Bonus type: {item['bonus_type']}"
+            ] = f"id: {item['id']} by {item['creator']}. Bonus type: {item['bonus_type']}"
             option["value"] = f"value-{index}"
             options.append(option)
         requests_selection["options"] = options
         requests_selection_body = copy.deepcopy(self.body)
         requests_selection_body["accessory"] = requests_selection
         requests_selection_body["block_id"] = "select_request_to_review"
-        bonus_type_statuses = get_all_bonus_request_statuses()
+        bonus_statuses = requests.get(
+            url=BASE_BACKEND_URL + "requests/status/", headers=FRONTEND_HEADER
+        ).json()
         bonus_type_statuses_to_select = copy.deepcopy(self.accessory)
         bonus_type_statuses_to_select["action_id"] = "select_status_type"
         bonus_type_statuses_to_select["placeholder"]["text"] = "Choose status type"
         bonus_type_options = []
-        for index, status in enumerate(bonus_type_statuses):
+        for index, status in enumerate(bonus_statuses):
+            print(status)
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = status
+            option["text"]["text"] = status["status_name"]
             option["value"] = f"value-{index}"
             bonus_type_options.append(option)
         bonus_type_statuses_to_select["options"] = bonus_type_options
