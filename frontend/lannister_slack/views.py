@@ -251,72 +251,85 @@ class InteractivesHandler(APIView):
                         status=status.HTTP_403_FORBIDDEN
                     )  # slack doesn't close modals on 40x errors
 
-        #             if (
-        #                 list(acquired_from_modal_messages[0].keys())[0]
-        #                 == "edit_request_bonus_type_selected"
-        #             ):
-        #                 # get id from the title
-        #                 request_id = loads.get("view").get("title").get("text").split("#")[-1]
-        #                 # print(request_id)
-        #                 values = loads.get("view").get("state").get("values")
-        #                 bonus_type = (
-        #                     values.get("edit_request_bonus_type_selected")
-        #                     .get("edit_request_bonus_type_selected")
-        #                     .get("selected_option")
-        #                     .get("text")
-        #                     .get("text")
-        #                 )
-        #                 description = (
-        #                     values.get("edit_request_description_from_modal")
-        #                     .get("edit_request_description_from_modal")
-        #                     .get("value")
-        #                 )
-        #                 channel_id = (
-        #                     loads.get("view").get("blocks")[0].get("block_id")
-        #                 )  # see comment in utils.py modal_on_bonus_request_edit() method
-        #                 bot_message = BotMessage(channel=channel_id, username=username)
+            if (
+                list(acquired_from_modal_messages[0].keys())[0]
+                == "edit_request_bonus_type_selected"
+            ):
+                # get id from the title
+                request_id = loads.get("view").get("title").get("text").split("#")[-1]
+                # print(request_id)
+                values = loads.get("view").get("state").get("values")
+                bonus_type = (
+                    values.get("edit_request_bonus_type_selected")
+                    .get("edit_request_bonus_type_selected")
+                    .get("selected_option")
+                    .get("text")
+                    .get("text")
+                )
+                description = (
+                    values.get("edit_request_description_from_modal")
+                    .get("edit_request_description_from_modal")
+                    .get("value")
+                )
+                channel_id = (
+                    loads.get("view").get("blocks")[0].get("block_id")
+                )  # see comment in utils.py modal_on_bonus_request_edit() method
+                bot_message = BotMessage(channel=channel_id, username=username)
 
-        #                 bonus_request = BonusRequest.objects.get(id=request_id)
-        #                 print(f"applied tz: {timezone.localtime(bonus_request.payment_date)}")
-        #                 created_status = BonusRequestStatus.objects.get(status_name="Created")
-        #                 request_in_history = BonusRequestsHistory.objects.filter(
-        #                     bonus_request=bonus_request
-        #                 ).first()
-        #                 print(request_in_history)
-        #                 if bonus_request.status != created_status:
-        #                     slack_client.chat_postMessage(
-        #                         **bot_message.base_styled_message(
-        #                             "*This ticket was already reviewed.*\n*Consider adding a new ticket*"
-        #                         )
-        #                     )
-        #                     return Response(
-        #                         status=status.HTTP_200_OK
-        #                     )  # have to return 200 or modal won't close and user will sit with WTF on his face
+                # bonus_request = BonusRequest.objects.get(id=request_id)
+                # print(f"applied tz: {timezone.localtime(bonus_request.payment_date)}")
+                # created_status = BonusRequestStatus.objects.get(status_name="Created")
+                # request_in_history = BonusRequestsHistory.objects.filter(
+                #     bonus_request=bonus_request
+                # ).first()
+                bonus_request_current_status = requests.get(
+                    url=BASE_BACKEND_URL + "requests/" + request_id,
+                    headers=FRONTEND_HEADER,
+                ).json()["status"]
 
-        #                 bonus_request.bonus_type = bonus_type
-        #                 bonus_request.description = description
-        #                 bonus_request.save()
+                if bonus_request_current_status != "Created":
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            "*This ticket was already reviewed.*\n*Consider adding a new ticket*"
+                        )
+                    )
+                    return Response(
+                        status=status.HTTP_200_OK
+                    )  # have to return 200 or modal won't close and user will sit with WTF on his face
 
-        #                 try:
-        #                     schedule_message_notification(
-        #                         channel=channel_id,
-        #                         username=username,
-        #                         collection=bonus_request,
-        #                         timestamp=timezone.localtime(bonus_request.payment_date),
-        #                     )
-        #                     slack_client.chat_postMessage(
-        #                         **bot_message.base_styled_message(
-        #                             "*Bonus request updated successfully*"
-        #                         )
-        #                     )
-        #                 except SlackApiError as e:
-        #                     print(e)
-        #                     slack_client.chat_postMessage(
-        #                         **bot_message.base_styled_message(
-        #                             "*Payment date of this request was expired*\n*Submit new ticket if you want*"
-        #                         )
-        #                     )
-        #                 return Response(status=status.HTTP_200_OK)
+                patch_bonus_request = requests.patch(
+                    url=BASE_BACKEND_URL + "requests/" + request_id,
+                    json={"bonus_type": bonus_type, "description": description},
+                    headers=FRONTEND_HEADER,
+                )
+
+                if patch_bonus_request.status_code == 200:
+                    try:
+                        schedule_message_notification(
+                            channel=channel_id,
+                            username=username,
+                            collection=patch_bonus_request,
+                            timestamp=patch_bonus_request.json()["payment_date"],
+                        )
+                        slack_client.chat_postMessage(
+                            **bot_message.base_styled_message(
+                                "*Bonus request updated successfully*"
+                            )
+                        )
+                    except SlackApiError as e:
+                        print(e)
+                        slack_client.chat_postMessage(
+                            **bot_message.base_styled_message(
+                                "*Payment date of this request was expired*\n*Submit new ticket if you want*"
+                            )
+                        )
+                    return Response(status=status.HTTP_200_OK)
+
+                return Response(
+                    data={
+                        "response": "There was an error during editing request, is backend server running?"
+                    }
+                )
 
         #             # find all the fields that were sent from modal element
         #             message_values = [item.values() for item in acquired_from_modal_messages]
@@ -403,55 +416,63 @@ class InteractivesHandler(APIView):
             #                         HANGING_INPUT_FIELD = True
             #                         return Response(status=status.HTTP_200_OK)
 
-            #             if action_id == "edit_request":
-            #                 selected_request = (
-            #                     loads.get("actions")[0]
-            #                     .get("selected_option")
-            #                     .get("text")
-            #                     .get("text")
-            #                 )
-            #                 # parse string for bonus request id, change the way of parsing id when output in dropdown element is changed
-            #                 find_request_id = selected_request.split(": ")[1].split(" ")[0]
-            #                 print(find_request_id)
-            #                 bonus_request_from_dropdown = BonusRequest.objects.get(
-            #                     id=int(find_request_id)
-            #                 )
-            #                 print(bonus_request_from_dropdown)
-            #                 modal = ModalMessage(channel_id, username)
-            #                 slack_client.views_open(
-            #                     trigger_id=loads.get("trigger_id"),
-            #                     view=modal.modal_on_bonus_request_edit(request_id=find_request_id),
-            #                     channel_id=channel_id,
-            #                 )
-            #                 return Response(status=status.HTTP_200_OK)
+            if action_id == "edit_request":
+                selected_request = (
+                    loads.get("actions")[0]
+                    .get("selected_option")
+                    .get("text")
+                    .get("text")
+                )
+                # parse string for bonus request id, change the way of parsing id when output in dropdown element is changed
+                find_request_id = selected_request.split(": ")[1].split(" ")[0]
+                print(find_request_id)
+                # bonus_request_from_dropdown = BonusRequest.objects.get(
+                #     id=int(find_request_id)
+                # )
+                selected_bonus_request = requests.get(
+                    url=BASE_BACKEND_URL + "requests/" + find_request_id,
+                    headers=FRONTEND_HEADER,
+                )
+                if selected_bonus_request.status_code == 404:
+                    raise Exception(
+                        "Bonus request selected by user in Slack was not found. Pls check find_request_id if you previously changed dropdown text output"
+                    )
+                print(selected_bonus_request)
+                modal = ModalMessage(channel_id, username)
+                slack_client.views_open(
+                    trigger_id=loads.get("trigger_id"),
+                    view=modal.modal_on_bonus_request_edit(request_id=find_request_id),
+                    channel_id=channel_id,
+                )
+                return Response(status=status.HTTP_200_OK)
 
-            #             if (
-            #                 action_id == "select_user_to_remove_from_reviewers"
-            #                 or action_id == "confirm_unassign"
-            #             ):
-            #                 # protecting data from being used when interactive event fires up and only being selected in dropdown but button wasn't clicked
-            #                 if action_id == "confirm_unassign":
-            #                     find_selected_username_to_unassign = (
-            #                         loads.get("state").get("values").values()
-            #                     )
-            #                     selected_username_to_unassign = (
-            #                         list(find_selected_username_to_unassign)[0]
-            #                         .get("select_user_to_remove_from_reviewers")
-            #                         .get("selected_option")["text"]["text"]
-            #                         .split(" ")[1][:-1]
-            #                     )
-            #                     user_to_unassign = LannisterUser.objects.get(
-            #                         username=selected_username_to_unassign
-            #                     )
-            #                     user_to_unassign.roles.remove(2)
-            #                     user_to_unassign.save()
-            #                     bot_message = BotMessage(channel=channel_id, username=username)
-            #                     slack_client.chat_postMessage(
-            #                         **bot_message.base_styled_message(
-            #                             message="*Reviewer was successfully removed*"
-            #                         )
-            #                     )
-            #                     return Response(status=status.HTTP_200_OK)
+            if (
+                action_id == "select_user_to_remove_from_reviewers"
+                or action_id == "confirm_unassign"
+            ):
+                # protecting data from being used when interactive event fires up and only being selected in dropdown but button wasn't clicked
+                if action_id == "confirm_unassign":
+                    find_selected_username_to_unassign = (
+                        loads.get("state").get("values").values()
+                    )
+                    selected_username_to_unassign = (
+                        list(find_selected_username_to_unassign)[0]
+                        .get("select_user_to_remove_from_reviewers")
+                        .get("selected_option")["text"]["text"]
+                        .split(" ")[1][:-1]
+                    )
+                    user_to_unassign = LannisterUser.objects.get(
+                        username=selected_username_to_unassign
+                    )
+                    user_to_unassign.roles.remove(2)
+                    user_to_unassign.save()
+                    bot_message = BotMessage(channel=channel_id, username=username)
+                    slack_client.chat_postMessage(
+                        **bot_message.base_styled_message(
+                            message="*Reviewer was successfully removed*"
+                        )
+                    )
+                    return Response(status=status.HTTP_200_OK)
 
             if action_id == "update_request_from_list":
                 bot_message = BotMessage(channel_id, username)
@@ -736,19 +757,25 @@ class EditRequestCommandView(APIView):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
+
+        bonus_requests_of_current_user = requests.get(
+            url=BASE_BACKEND_URL + "requests/?user=" + username, headers=FRONTEND_HEADER
+        ).json()
+
         # text = request.data.get("text", None)
-        # current_user = LannisterUser.objects.get(username=username)
-        # bonus_requests = BonusRequest.objects.filter(creator=current_user)
-        # if len(bonus_requests) == 0:
-        #     bot_message = BotMessage(channel, username)
-        #     slack_client.chat_postMessage(
-        #         **bot_message.base_styled_message(
-        #             "You haven't created any bonus requests.\n *Hint: proceed with /new-request*"
-        #         )
-        #     )
-        #     return Response(status=status.HTTP_200_OK)
+
+        if len(bonus_requests_of_current_user) == 0:
+            bot_message = BotMessage(channel, username)
+            slack_client.chat_postMessage(
+                **bot_message.base_styled_message(
+                    "You haven't created any bonus requests.\n *Hint: proceed with /new-request*"
+                )
+            )
+            return Response(status=status.HTTP_200_OK)
         # # print(bonus_requests)
-        message = MessageWithDropdowns(channel, username, collection=bonus_requests)
+        message = MessageWithDropdowns(
+            channel, username, collection=bonus_requests_of_current_user
+        )
         slack_client.chat_postMessage(**message.show_bonus_requests_by_user())
         return Response(status=status.HTTP_200_OK)
 
