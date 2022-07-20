@@ -11,7 +11,6 @@ from lannister_requests.serializers import (
     BonusRequestStatusSerializer,
     BonusTypeSerializer,
 )
-from rest_framework.permissions import IsAuthenticated
 from lannister_requests.permissions import IsUser
 from rest_framework.response import Response
 from rest_framework import status
@@ -45,6 +44,19 @@ class BonusRequestViewSet(ModelViewSet):
         returns list if called on collection aka /api/requests/?user=demigorrgon
         returns single element on /api/requests/1?user=demigorrgon
         """
+        if self.request.query_params.get("reviewer") and self.request.query_params.get(
+            "reviewable"
+        ):
+            """
+            Example: GET /api/requests/?reviewer=demitest&reviewable=true
+            returns array of bonus requests assigned to provided reviewer and queries whether ticket's status is 'Created'
+            """
+            created_status = BonusRequestStatus.objects.get(status_name="Created")
+            queryset = self.queryset.filter(
+                reviewer__username=self.request.query_params.get("reviewer")
+            ).filter(status=created_status)
+            return queryset
+
         if self.request.query_params.get("user"):
             queryset = self.queryset.filter(
                 creator__username=self.request.query_params.get("user")
@@ -56,6 +68,7 @@ class BonusRequestViewSet(ModelViewSet):
                 reviewer__username=self.request.query_params.get("reviewer")
             )
             return queryset
+        # if self.request.query_params.get("")
         return self.queryset
 
     # def perform_create(self, serializer):
