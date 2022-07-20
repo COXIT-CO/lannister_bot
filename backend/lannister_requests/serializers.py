@@ -61,6 +61,8 @@ class BonusRequestBaseSerializer(ModelSerializer):
 
 
 class BonusRequestHistorySerializer(ModelSerializer):
+    status = SerializerMethodField()
+
     class Meta:
         model = BonusRequestsHistory
         fields = (
@@ -71,6 +73,9 @@ class BonusRequestHistorySerializer(ModelSerializer):
             "status",
             "updated_at",
         )
+
+    def get_status(self, obj):
+        return obj.status.status_name
 
 
 class FullHistorySerializer(ModelSerializer):
