@@ -1,15 +1,19 @@
 from rest_framework import serializers
 from lannister_auth .models import LannisterUser
-from lannister_slack .models import BonusRequest
 
 
-class WorkerSerializer(serializers.ModelSerializer):
+class WorkerBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = LannisterUser
-        fields = "__all__"
+        fields = ["id", "username", "email", "first_name", "last_name", "roles"]
+        read_only_fields = ["id", "roles"]
 
 
-class RequestSerializer(serializers.ModelSerializer):
+class WorkerAdminSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BonusRequest
-        fields = "__all__"
+        model = LannisterUser
+        fields = ["id", "username", "email", "first_name", "last_name", "roles"]
+        read_only_fields = ["id"]
+
+
+

@@ -1,38 +1,56 @@
+from rest_framework import serializers
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-from lannister_requests.models import BonusRequest, BonusRequestStatus
-# from lannister_slack.serializers import BonusRequestSerializer
+from lannister_requests.models import BonusRequest
+from lannister_requests.models import BonusRequestStatus
 from lannister_requests.serializers import BonusRequestAdminSerializer, BonusRequestRewieverSerializer, \
     BonusRequestBaseSerializer, FullHistorySerializer, BonusRequestStatusSerializer
 from rest_framework.permissions import IsAuthenticated
-from lannister_requests.permissions import IsUser
+from lannister_requests.permissions import IsUserOrAdministrator, IsAdministrator, ReadOnly
+from lannister_auth.models import Role
 
 
 class BonusRequestViewSet(ModelViewSet):
-    permission_classes = (IsAuthenticated, IsUser, )
-    queryset = BonusRequest.objects.all()
+    permission_classes = (IsUserOrAdministrator, )
+    queryset = BonusRequest.objects.all().order_by('creator', 'reviewer')
 
-    # serializer_class = BonusRequestSerializer
-
-
-    """
-    TODO: Implement better get_serializer_class
-    """
-    methods = ["GET", "PATCH", "DELETE"]
     def get_serializer_class(self):
-        if self.request.method in self.methods:
-            if self.request.user.is_superuser:
+        # Allow different feild only on PATCH method
+        if self.request.method == "PATCH":
+            if self.request.user.is_superuser or self.request.user.is_staff \
+                    or Role.objects.get(name="Administrator") in self.request.user.roles.all():
                 return BonusRequestAdminSerializer
-            elif self.request.user.is_staff: #mock for refactoring after getting permissions
+            elif Role.objects.get(name="Reviewer") in self.request.user.roles.all():
                 return BonusRequestRewieverSerializer
+        # On all other methods return basic serializer
         return BonusRequestBaseSerializer
 
     def get_queryset(self):
-        """
-        Another queryset for each groups
-        NOW MOCK TILL HAVEN`T PERMISSIONS AND ROLE IMPLEMENT
-        """
-        queryset = self.queryset.all()
-        return queryset
+        worker_queryset = Role.objects.none()
+        reviewer_queryset = Role.objects.none()
+        admin_queryset = Role.objects.none()
+        if Role.objects.get(name="Worker") in self.request.user.roles.all():
+            worker_queryset = self.queryset.filter(creator=self.request.user)
+        if Role.objects.get(name="Reviewer") in self.request.user.roles.all():
+            reviewer_queryset = self.queryset.filter(reviewer=self.request.user)
+        if Role.objects.get(name="Administrator") in self.request.user.roles.all():
+            admin_queryset = self.queryset.all().exclude(creator=self.request.user)
+        result = worker_queryset | reviewer_queryset | admin_queryset
+        return result
+
+    def perform_update(self, serializer):
+        if Role.objects.get(name="Administrator") not in self.request.user.roles.all() and \
+                (serializer.validated_data.get('reviewer') or serializer.validated_data.get('description')) and\
+                self.request.user != self.get_object().creator:
+            res = serializers.ValidationError({'message' : 'You cannot update this field of not YOUR request'})
+            res.status_code = 406
+            raise res
+        if Role.objects.get(name="Administrator") not in self.request.user.roles.all() and \
+                (serializer.validated_data.get('status') or serializer.validated_data.get('price_usd') or
+            serializer.validated_data.get('payment_date')) and self.request.user == self.get_object().creator:
+            res = serializers.ValidationError({'message' : 'You cannot update this field of YOUR request'})
+            res.status_code = 406
+            raise res
+        serializer.save()
 
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
@@ -41,16 +59,26 @@ class BonusRequestViewSet(ModelViewSet):
 
 class HistoryRequestViewSet(ReadOnlyModelViewSet):
 
-    """When get model of Roles implement permissions"""
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, ReadOnly)
     serializer_class = FullHistorySerializer
-    queryset = BonusRequest.objects.all()
+    queryset = BonusRequest.objects.all().order_by('creator', 'reviewer')
 
+    def get_queryset(self):
+        worker_queryset = Role.objects.none()
+        reviewer_queryset = Role.objects.none()
+        admin_queryset = Role.objects.none()
+        if Role.objects.get(name="Worker") in self.request.user.roles.all():
+            worker_queryset = self.queryset.filter(creator=self.request.user)
+        if Role.objects.get(name="Reviewer") in self.request.user.roles.all():
+            reviewer_queryset = self.queryset.filter(reviewer=self.request.user)
+        if Role.objects.get(name="Administrator") in self.request.user.roles.all():
+            admin_queryset = self.queryset.all().exclude(creator=self.request.user)
+        result = worker_queryset | reviewer_queryset | admin_queryset
+        return result
 
 class BonusRequestStatusViewSet(ModelViewSet):
 
-    """When get model of Role implement permissions"""
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, IsAdministrator, )
     serializer_class = BonusRequestStatusSerializer
     queryset = BonusRequestStatus.objects.all()
 
