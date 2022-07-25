@@ -1,15 +1,15 @@
 import copy
 import json
 from datetime import datetime, timedelta
-from lannister_auth.models import LannisterUser
-from lannister_auth.serializers import UserSerializer
-from lannister_requests.models import BonusRequest, BonusRequestStatus
-from lannister_slack.serializers import (
-    BonusRequestSerializer,
-    BonusRequestStatusSerializer,
-    BonusRequestHistory,
-)
+from pprint import pprint
+
+import requests
+
 from .views import slack_client
+from django.conf import settings
+
+BASE_BACKEND_URL = settings.BASE_BACKEND_URL
+FRONTEND_HEADER = settings.CUSTOM_FRONTEND_HEADER
 
 
 def prettify_json(data):
@@ -23,38 +23,18 @@ def prettify_json(data):
 
 def list_requests_message_constructor(collection):
     return f"*Request id: {collection['id']}*\n \
-*Status: {collection['status']['status_name']}*\n \
-*Reviewer: {collection.get('reviewer').get('username') if collection.get('reviewer') else 'Unassigned'}*\n \
+*Status: {collection['status']}*\n \
+*Reviewer: {collection.get('reviewer') if collection.get('reviewer') else 'Unassigned'}*\n \
 - Request description: {collection['description']}\n \
 - Request created at: {collection['created_at']}\n \
 - Request last updated at: {collection['updated_at']}\n \
 - Payment date: {collection['payment_date']}\n"
 
 
-def get_all_reviewers():
-    reviewers_qs = LannisterUser.objects.filter(roles__in=[2])
-    reviewers = [UserSerializer(reviewer).data for reviewer in reviewers_qs]
-    return reviewers
-
-
-def get_all_bonus_types():
-    bonus_requests = BonusRequest.bonus_type.field.choices  # returns list of tuples
-    bonus_types = set([choice[0] for choice in bonus_requests])
-    return bonus_types
-
-
-def get_all_bonus_request_statuses():
-    status_choises = BonusRequestStatus.objects.all()
-    statuses = [
-        BonusRequestStatusSerializer(choice).data["status_name"]
-        for choice in status_choises
-    ]
-    print(statuses)
-    return statuses
-
-
-def schedule_message_notification(channel, username, collection, timestamp):
-    ts_to_epoch = timestamp.strftime("%s")
+def schedule_message_notification(channel, username, collection, timestamp: str):
+    timestamp_to_datetime = datetime.strptime(timestamp, "%d-%m-%Y %H:%M %Z")
+    # localtime = timezone.localtime(timestamp_to_datetime)
+    ts_to_epoch = timestamp_to_datetime.strftime("%s")
     bot_message = BotMessage(
         channel=channel, username=username, collection=collection, queryset=ts_to_epoch
     )
@@ -268,11 +248,8 @@ class BotMessage:
 
     def list_requests(self):
         self.header["text"]["text"] = f"List of bonus requests by {self.username}"
-        serialized_collection = [
-            BonusRequestSerializer(item).data for item in self.collection
-        ]
-        print(serialized_collection)
-        if len(serialized_collection) == 0:
+        print(self.collection)
+        if len(self.collection) == 0:
             self.body["text"][
                 "text"
             ] = "You haven't submitted any requests.\n*Hint*: /new-request"
@@ -280,7 +257,7 @@ class BotMessage:
             return self.response
         # create and construct string from Queryset passed as self.collection
         requests_list = []
-        for collection in serialized_collection:
+        for collection in self.collection:
             construct_text_response = list_requests_message_constructor(collection)
             requests_list.append(construct_text_response)
         # print(requests_list)
@@ -311,15 +288,16 @@ class BotMessage:
         return self.response
 
     def list_users(self):
-        users = LannisterUser.objects.all()
-        serialized_users = [UserSerializer(user).data for user in users]
+        list_all_users = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/", headers=FRONTEND_HEADER
+        ).json()
         self.header["text"]["text"] = "List of users and their roles"
         self.response["blocks"] = [self.divider, self.header, self.divider]
-        for user in serialized_users:
+        for user in list_all_users:
             users_data = copy.deepcopy(self.body)
             users_data["text"][
                 "text"
-            ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*"
+            ] = f"User: {user.get('username')}, known as *{user.get('first_name')} {user.get('last_name')}*\nRoles: *{', '.join([item['name'] for item in user['roles']])}*"
             self.response["blocks"].append(users_data)
         print(prettify_json(self.response))
         return self.response
@@ -332,35 +310,30 @@ class BotMessage:
                 "text"
             ] = "Deadline of this request is right now. Pls approve or reject:"
             self.response["text"] = "reviewer_notification"
-        serialize_bonus_request = BonusRequestSerializer(self.collection)
+        print(self.collection.json())
+        bonus_request = self.collection.json()
         ticket_creator = self.body
         ticket_creator["text"][
             "text"
-        ] = f'*{serialize_bonus_request.data.get("creator").get("username")} has requested the following stuff. Approve or reject it.*'
+        ] = f'*{bonus_request.get("creator")} has requested the following stuff. Approve or reject it.*'
         ticket_status = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
-        ticket_status[
-            "text"
-        ] = f'Current status: *{serialize_bonus_request.data.get("status").get("status_name")}*'
+        ticket_status["text"] = f'Current status: *{bonus_request.get("status")}*'
         bonus_type = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        bonus_type[
-            "text"
-        ] = f'Bonus type: *{serialize_bonus_request.data.get("bonus_type")}*'
+        bonus_type["text"] = f'Bonus type: *{bonus_request.get("bonus_type")}*'
         requested_reward_in_usd = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
         requested_reward_in_usd[
             "text"
-        ] = f'Requested reward amount: ${serialize_bonus_request.data.get("price_usd")}'
+        ] = f'Requested reward amount: ${bonus_request.get("price_usd")}'
         description = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        description[
-            "text"
-        ] = f'Description: *{serialize_bonus_request.data.get("description")}*'
+        description["text"] = f'Description: *{bonus_request.get("description")}*'
         payment_date = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
         payment_date[
             "text"
-        ] = f'Requested payment date: *{serialize_bonus_request.data.get("payment_date")}*'
+        ] = f'Requested payment date: *{bonus_request.get("payment_date")}*'
 
         self.multiple_horizontal_text_elements["fields"] = [
             ticket_status,
@@ -374,12 +347,12 @@ class BotMessage:
         reject_button = copy.deepcopy(self.singular_horizontal_button)
 
         approve_button["text"]["text"] = "Approve"
-        approve_button["action_id"] = f"approve_id_{self.collection.id}"
+        approve_button["action_id"] = f"approve_id_{self.collection.json()['id']}"
         approve_button["style"] = "primary"
         approve_button["value"] = "approved_request"
         self.multiple_horizontal_buttons["elements"].append(approve_button)
         reject_button["text"]["text"] = "Reject"
-        reject_button["action_id"] = f"reject_id_{self.collection.id}"
+        reject_button["action_id"] = f"reject_id_{self.collection.json()['id']}"
         reject_button["style"] = "danger"
         reject_button["value"] = "rejected_request"
         self.multiple_horizontal_buttons["elements"].append(reject_button)
@@ -396,37 +369,30 @@ class BotMessage:
         return self.response
 
     def history_static_output(self):
-        self.header["text"]["text"] = f"#{self.collection.id} request history"
-        serialize_bonus_request = BonusRequestSerializer(self.collection)
+        self.header["text"]["text"] = f"#{self.collection['id']} request history"
         ticket_creator = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
-        ticket_creator[
-            "text"
-        ] = f'By: {serialize_bonus_request.data.get("creator").get("username")}'
+        ticket_creator["text"] = f'By: {self.collection.get("creator")}'
         bonus_type = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        bonus_type[
-            "text"
-        ] = f'Bonus type: *{serialize_bonus_request.data.get("bonus_type")}*'
+        bonus_type["text"] = f'Bonus type: *{self.collection.get("bonus_type")}*'
         requested_reward_in_usd = copy.deepcopy(
             self.markdown_text_from_multiple_horizontal_fields
         )
         requested_reward_in_usd[
             "text"
-        ] = f'Requested reward amount: ${serialize_bonus_request.data.get("price_usd")}'
+        ] = f'Requested reward amount: ${self.collection.get("price_usd")}'
         description = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
-        description[
-            "text"
-        ] = f'Description: *{serialize_bonus_request.data.get("description")}*'
+        description["text"] = f'Description: *{self.collection.get("description")}*'
         payment_date = copy.deepcopy(self.markdown_text_from_multiple_horizontal_fields)
         payment_date[
             "text"
-        ] = f'Requested payment date: *{serialize_bonus_request.data.get("payment_date")}*'
+        ] = f'Requested payment date: *{self.collection.get("payment_date")}*'
         statuses = []
-        serialized_history = [BonusRequestHistory(item).data for item in self.queryset]
-        for item in serialized_history:  # grab status and updated_at
-            print(item)
-            history_display = f'Status: {item["status"]["status_name"]}, last updated at: {item["updated_at"]}'
+        for item in self.collection.get("history_requests"):
+            history_display = (
+                f'Status: {item["status"]}, last updated at: {item["updated_at"]}'
+            )
             statuses.append(history_display)
 
         self.multiple_horizontal_text_elements["fields"] = [
@@ -451,16 +417,12 @@ class BotMessage:
 
     def list_reviewable_requests_by_current_reviewer(self):
         self.header["text"]["text"] = "Assigned bonus request tickets to me"
-        serialized_tickets = [
-            BonusRequestSerializer(item).data for item in self.collection
-        ]
-        print(serialized_tickets)
         self.response["blocks"] = [self.divider, self.header]
-        for ticket in serialized_tickets:
+        for ticket in self.collection:
             ticket_data = copy.deepcopy(self.body)
             ticket_data["text"][
                 "text"
-            ] = f"Ticket id: *#{ticket['id']}*\nSubmitted by: *{ticket['creator']['username']}*\nStatus: *{ticket['status']['status_name']}*\nPayment date: *{ticket['payment_date']}*\nDescription: *{ticket['description']}*\nLast time updated at: *{ticket['updated_at']}*"
+            ] = f"Ticket id: *#{ticket['id']}*\nSubmitted by: *{ticket['creator']}*\nStatus: *{ticket['status']}*\nPayment date: *{ticket['payment_date']}*\nDescription: *{ticket['description']}*\nLast time updated at: *{ticket['updated_at']}*"
             self.response["blocks"].append(ticket_data)
 
         print(prettify_json(self.response))
@@ -605,7 +567,10 @@ class ModalMessage(BotMessage):
             self.divider
         )  # very dangerous workaround to find channel id in triggered modal, rework if possible
         divider_with_channel_id["block_id"] = self.channel
-        bonus_types = get_all_bonus_types()
+        # bonus_types = get_all_bonus_types()
+        bonus_types = requests.get(
+            url=BASE_BACKEND_URL + "requests/bonus-types/", headers=FRONTEND_HEADER
+        ).json()
         self.dropdown_in_modal["label"]["text"] = "Edit bonus type"
         self.dropdown_in_modal["element"][
             "action_id"
@@ -613,9 +578,10 @@ class ModalMessage(BotMessage):
         self.dropdown_in_modal["block_id"] = "edit_request_bonus_type_selected"
 
         options = []
+        print(bonus_types)
         for index, bonus_type in enumerate(bonus_types):
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = bonus_type
+            option["text"]["text"] = bonus_type["bonus_type"]["bonus_type"]
             option["value"] = f"value-{index}"
             options.append(option)
         self.dropdown_in_modal["element"]["options"] = options
@@ -641,11 +607,13 @@ class ModalMessage(BotMessage):
         divider_with_channel_id["block_id"] = channel_id
         self.response["title"]["text"] = "New bonus request"
         reviewers_dropdown = copy.deepcopy(self.dropdown_in_modal)
-        bonus_types = get_all_bonus_types()
+        bonus_types = requests.get(
+            url=settings.BASE_BACKEND_URL + "requests/bonus-types/"
+        ).json()
         options = []
         for index, bonus_type in enumerate(bonus_types):
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = bonus_type
+            option["text"]["text"] = bonus_type["bonus_type"]["bonus_type"]
             option["value"] = f"value-{index}"
             options.append(option)
         bonus_type_dropdown = copy.deepcopy(self.dropdown_in_modal)
@@ -672,7 +640,11 @@ class ModalMessage(BotMessage):
         self.timepicker["element"]["action_id"] = "new_bonus_request_selected_time"
         self.timepicker["label"]["text"] = "Pick a payment time"
 
-        reviewers = get_all_reviewers()
+        # reviewers = get_all_reviewers()
+        reviewers = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/reviewers",
+            headers=FRONTEND_HEADER,
+        ).json()
         reviewers_dropdown["label"]["text"] = "Select a reviewer"
         reviewers_dropdown["element"][
             "action_id"
@@ -716,15 +688,16 @@ class MessageWithDropdowns(BotMessage):
         self.body["text"]["text"] = "Select bonus request:"
 
         options = []
-        serialized_requests = []
-        for bonus_request in self.queryset:
-            serialized_request = BonusRequestSerializer(bonus_request).data
-            serialized_requests.append(serialized_request)
-        for index, request in enumerate(serialized_requests):
+        bonus_requests_of_current_user = requests.get(
+            url=BASE_BACKEND_URL + f"requests/?user={self.username}",
+            headers=FRONTEND_HEADER,
+        ).json()
+
+        for index, request in enumerate(bonus_requests_of_current_user):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"id: {request['id']} {request['bonus_type']} by: {request['creator']['username']} at {request['created_at']}"
+            ] = f"id: {request['id']} {request['bonus_type']} by: {request['creator']} at {request['created_at']}"
             option["value"] = f"value-{index}"
             options.append(option)
 
@@ -745,11 +718,14 @@ class MessageWithDropdowns(BotMessage):
         accessory_reviewers = copy.deepcopy(self.accessory)
         accessory_reviewers["action_id"] = "select_reviewer"
         accessory_reviewers["placeholder"]["text"] = "Enter reviewer's name"
-        reviewers = get_all_reviewers()
+        # reviewers = get_all_reviewers()
+        available_reviewers = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/reviewers/", headers=FRONTEND_HEADER
+        ).json()
         options_reviewers = []
-        for index, item in enumerate(reviewers):
+        for index, reviewer in enumerate(available_reviewers):
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = f"{item['username']}"
+            option["text"]["text"] = f"{reviewer['username']}"
             option["value"] = f"value-{index}"
             options_reviewers.append(option)
         accessory_reviewers["options"] = options_reviewers
@@ -760,17 +736,13 @@ class MessageWithDropdowns(BotMessage):
         return reviewer_section
 
     def show_bonus_requests_by_user(self):
-        bonus_requests = []
         dropdown_choices = []
-        for item in self.collection:
-            serialized_bonus_request_by_user = BonusRequestSerializer(item).data
-            bonus_requests.append(serialized_bonus_request_by_user)
-
-        for index, bonus_request in enumerate(bonus_requests):
+        pprint(self.collection)
+        for index, bonus_request in enumerate(self.collection):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']['status_name']}"
+            ] = f"Request id: {bonus_request['id']} Created at: {bonus_request['created_at']}, status: {bonus_request['status']}"
             option["value"] = f"value-{index}"
             dropdown_choices.append(option)
         self.header["text"]["text"] = "Select bonus request to edit"
@@ -797,7 +769,9 @@ class MessageWithDropdowns(BotMessage):
         self.button["block_id"] = "confirm_unassign"
         self.button["elements"][0]["action_id"] = "confirm_unassign"
         self.button["elements"][0]["text"]["text"] = "Confirm unassign"
-        reviewers = get_all_reviewers()
+        reviewers = requests.get(
+            url=BASE_BACKEND_URL + "workers/list/reviewers", headers=FRONTEND_HEADER
+        ).json()
         dropdown_choices = []
         for index, reviewer in enumerate(reviewers):
             option = copy.deepcopy(self.option)
@@ -816,32 +790,34 @@ class MessageWithDropdowns(BotMessage):
         self.body["text"]["text"] = "Select request to review"
         requests_selection = copy.deepcopy(self.accessory)
         requests_selection["action_id"] = "select_request_to_review"
-        not_reviewed_requests_qs = BonusRequest.objects.filter(
-            status__status_name="Created"
-        )
-        not_reviewed_requests = [
-            BonusRequestSerializer(item).data for item in not_reviewed_requests_qs
-        ]
+        available_to_review_requests = requests.get(
+            url=BASE_BACKEND_URL + f"requests/?reviewer={self.username}",
+            headers=FRONTEND_HEADER,
+        ).json()
+        print(available_to_review_requests)
         options = []
-        for index, item in enumerate(not_reviewed_requests):
+        for index, item in enumerate(available_to_review_requests):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"id: {item['id']} by {item['creator']['username']}. Bonus type: {item['bonus_type']}"
+            ] = f"id: {item['id']} by {item['creator']}. Bonus type: {item['bonus_type']}"
             option["value"] = f"value-{index}"
             options.append(option)
         requests_selection["options"] = options
         requests_selection_body = copy.deepcopy(self.body)
         requests_selection_body["accessory"] = requests_selection
         requests_selection_body["block_id"] = "select_request_to_review"
-        bonus_type_statuses = get_all_bonus_request_statuses()
+        bonus_statuses = requests.get(
+            url=BASE_BACKEND_URL + "requests/status/", headers=FRONTEND_HEADER
+        ).json()
         bonus_type_statuses_to_select = copy.deepcopy(self.accessory)
         bonus_type_statuses_to_select["action_id"] = "select_status_type"
         bonus_type_statuses_to_select["placeholder"]["text"] = "Choose status type"
         bonus_type_options = []
-        for index, status in enumerate(bonus_type_statuses):
+        for index, status in enumerate(bonus_statuses):
+            print(status)
             option = copy.deepcopy(self.option)
-            option["text"]["text"] = status
+            option["text"]["text"] = status["status_name"]
             option["value"] = f"value-{index}"
             bonus_type_options.append(option)
         bonus_type_statuses_to_select["options"] = bonus_type_options
@@ -869,23 +845,23 @@ class MessageWithDropdowns(BotMessage):
         self.multi_static_select["label"][
             "text"
         ] = "Select bonus request to see its history of statuses"
-        bonus_requests = BonusRequest.objects.all()
+        # bonus_requests = BonusRequest.objects.all()
+        bonus_requests = requests.get(
+            url=BASE_BACKEND_URL + "requests/", headers=FRONTEND_HEADER
+        ).json()
+        print(prettify_json(bonus_requests))
         if len(bonus_requests) == 0:
             self.body["text"][
                 "text"
             ] = "*No bonus requests were created.\n/new-request to add some*"
             self.response["blocks"] = [self.divider, self.body, self.divider]
             return self.response
-
-        serialized_requests = [
-            BonusRequestSerializer(item).data for item in bonus_requests
-        ]
         options = []
-        for index, request in enumerate(serialized_requests):
+        for index, request in enumerate(bonus_requests):
             option = copy.deepcopy(self.option)
             option["text"][
                 "text"
-            ] = f"{request['creator']['username']}'s {request['bonus_type']} request #{request['id']} for ${request['price_usd']}"
+            ] = f"{request['creator']}'s {request['bonus_type']} request #{request['id']} for ${request['price_usd']}"
             option["value"] = f"value-{index}"
             options.append(option)
 

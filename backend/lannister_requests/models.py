@@ -64,7 +64,7 @@ class BonusRequest(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
+        return f"id: {self.pk} {self.creator}'s bonus request. Reviewer assigned - {self.reviewer}"
 
     class Meta:
         db_table = "bonus_requests"

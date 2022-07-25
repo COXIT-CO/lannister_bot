@@ -1,4 +1,7 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import (
+    ModelSerializer,
+    SerializerMethodField,
+)
 from lannister_requests.models import (
     BonusRequest,
     BonusRequestsHistory,
@@ -30,6 +33,10 @@ class BonusRequestRewieverSerializer(ModelSerializer):
 
 
 class BonusRequestBaseSerializer(ModelSerializer):
+    status = SerializerMethodField()
+    creator = SerializerMethodField()
+    reviewer = SerializerMethodField()
+
     class Meta:
         model = BonusRequest
         fields = "__all__"
@@ -41,8 +48,21 @@ class BonusRequestBaseSerializer(ModelSerializer):
             "payment_date",
         )
 
+    def get_status(self, obj):
+        return obj.status.status_name
+
+    def get_creator(self, obj):
+        return obj.creator.username
+
+    def get_reviewer(self, obj):
+        if not obj.reviewer:
+            return None
+        return obj.reviewer.username
+
 
 class BonusRequestHistorySerializer(ModelSerializer):
+    status = SerializerMethodField()
+
     class Meta:
         model = BonusRequestsHistory
         fields = (
@@ -54,9 +74,13 @@ class BonusRequestHistorySerializer(ModelSerializer):
             "updated_at",
         )
 
+    def get_status(self, obj):
+        return obj.status.status_name
+
 
 class FullHistorySerializer(ModelSerializer):
     history_requests = BonusRequestHistorySerializer(many=True, read_only=True)
+    creator = SerializerMethodField()
 
     class Meta:
         model = BonusRequest
@@ -70,8 +94,22 @@ class FullHistorySerializer(ModelSerializer):
             "history_requests",
         ]
 
+    def get_creator(self, obj):
+        return obj.creator.username
+
 
 class BonusRequestStatusSerializer(ModelSerializer):
     class Meta:
         model = BonusRequestStatus
         fields = "__all__"
+
+
+class BonusTypeSerializer(ModelSerializer):
+    bonus_type = SerializerMethodField()
+
+    class Meta:
+        fields = ["bonus_type"]
+        model = BonusRequest
+
+    def get_bonus_type(self, obj):
+        return obj

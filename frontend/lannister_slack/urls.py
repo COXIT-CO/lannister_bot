@@ -2,7 +2,6 @@ from django.urls import path
 from lannister_slack.views import (
     SlackEventView,
     InteractivesHandler,
-    BonusRequestViewSet,
     RegisterUserCommandView,
     ChooseActionCommandView,
     ListRequestsCommandView,
@@ -12,10 +11,9 @@ from lannister_slack.views import (
     AddReviewerCommandView,
     RemoveReviewerCommandView,
     ListUsersCommandView,
-    BonusRequestStatusChangeHistoryView,
+    BonusRequestHistoryView,
     ListReviewableRequests,
 )
-from rest_framework.routers import DefaultRouter
 
 urlpatterns = [
     path("events", SlackEventView.as_view(), name="slack-events"),
@@ -30,7 +28,7 @@ urlpatterns = [
     path(
         "remove-reviewer", RemoveReviewerCommandView.as_view(), name="remove-reviewer"
     ),
-    path("history", BonusRequestStatusChangeHistoryView.as_view(), name="history"),
+    path("history", BonusRequestHistoryView.as_view(), name="history"),
     path("list-users", ListUsersCommandView.as_view(), name="list-users"),
     path(
         "list-requests-to-review",
@@ -38,7 +36,3 @@ urlpatterns = [
         name="list-requests-to-review",
     ),
 ]
-
-router = DefaultRouter()
-router.register("bonus-requests", BonusRequestViewSet)
-urlpatterns += router.urls
