@@ -8,7 +8,7 @@ def confirm_button_payload(user):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": user.username,
+                    "username": user["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -92,7 +92,7 @@ def modal_payload_on_new_request(*args):
                 "team": {"id": "T03MJUGC8HK", "domain": "lannistertestteam"},
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -297,7 +297,7 @@ def modal_payload_on_new_request(*args):
                                     "selected_option": {
                                         "text": {
                                             "type": "plain_text",
-                                            "text": args[1].username,
+                                            "text": args[1]["username"],
                                             "emoji": True,
                                         },
                                         "value": "value-3",
@@ -358,14 +358,15 @@ def modal_payload_on_new_request(*args):
 
 
 def edit_request_payload_dropdown(*args):
+    print(args)
     return {
         "payload": json.dumps(
             {
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
-                    "name": args[0].username,
+                    "username": args[0]["username"],
+                    "name": args[0]["username"],
                     "team_id": "T03MJUGC8HK",
                 },
                 "api_app_id": "A03MMSE5XR8",
@@ -378,7 +379,7 @@ def edit_request_payload_dropdown(*args):
                 "trigger_id": "3785012457027.3732968416597.62a91140941754939db935d80d7608a1",
                 "team": {"id": "T03MJUGC8HK", "domain": "lannistertestteam"},
                 "channel": {
-                    "id": args[1].slack_channel_id,
+                    "id": args[1]["slack_channel_id"],
                     "name": "directmessage",
                 },
                 "message": {
@@ -418,7 +419,7 @@ def edit_request_payload_dropdown(*args):
                                     {
                                         "text": {
                                             "type": "plain_text",
-                                            "text": f"Request id: {args[2].id} Created at: 10-07-2022 12:43 EEST, status: Rejected",
+                                            "text": f"Request id: {args[2]['id']} Created at: 10-07-2022 12:43 EEST, status: Rejected",
                                         },
                                         "value": "value-0",
                                     },
@@ -435,7 +436,7 @@ def edit_request_payload_dropdown(*args):
                                 "selected_option": {
                                     "text": {
                                         "type": "plain_text",
-                                        "text": f"Request id: {args[2].id} Created at: 11-07-2022 21:59 EEST, status: Created",
+                                        "text": f"Request id: {args[2]['id']} Created at: 11-07-2022 21:59 EEST, status: Created",
                                     },
                                     "value": "value-23",
                                 },
@@ -452,7 +453,7 @@ def edit_request_payload_dropdown(*args):
                         "selected_option": {
                             "text": {
                                 "type": "plain_text",
-                                "text": f"Request id: {args[2].id} Created at: 11-07-2022 21:59 EEST, status: Created",
+                                "text": f"Request id: {args[2]['id']} Created at: 11-07-2022 21:59 EEST, status: Created",
                             },
                             "value": "value-23",
                         },
@@ -476,7 +477,7 @@ def edit_request_modal_payload(*args):
                 "team": {"id": "T03MJUGC8HK", "domain": "lannistertestteam"},
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -561,7 +562,7 @@ def edit_request_modal_payload(*args):
                     "hash": "1657567640.xv6fpgmn",
                     "title": {
                         "type": "plain_text",
-                        "text": f"Edit bonus request #{args[1].id}",
+                        "text": f"Edit bonus request #{args[1]['id']}",
                     },
                     "close": {
                         "type": "plain_text",
@@ -590,7 +591,7 @@ def add_reviewer_payload(*args):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -697,7 +698,7 @@ def add_reviewer_payload(*args):
                                 "selected_option": {
                                     "text": {
                                         "type": "plain_text",
-                                        "text": f"id: {args[2].id} Overtime by: demigorrgon at 11-07-2022 22:51 EEST",
+                                        "text": f"id: {args[2]['id']} Overtime by: demigorrgon at 11-07-2022 22:51 EEST",
                                     },
                                     "value": "value-23",
                                 },
@@ -709,7 +710,7 @@ def add_reviewer_payload(*args):
                                 "selected_option": {
                                     "text": {
                                         "type": "plain_text",
-                                        "text": args[1].username,
+                                        "text": args[1]["username"],
                                     },
                                     "value": "value-3",
                                 },
@@ -749,7 +750,7 @@ def remove_reviewer_payload(*args):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -844,7 +845,7 @@ def remove_reviewer_payload(*args):
                                 "selected_option": {
                                     "text": {
                                         "type": "plain_text",
-                                        "text": f"Reviewer: {args[1].username}, Ka Bob",
+                                        "text": f"Reviewer: {args[1]['username']}, Ka Bob",
                                     },
                                     "value": "value-1",
                                 },
@@ -877,7 +878,7 @@ def history_payload(*args):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -961,14 +962,14 @@ def history_payload(*args):
                                     {
                                         "text": {
                                             "type": "plain_text",
-                                            "text": f"demigorrgon's Referral request #{args[1].id} for $333.00",
+                                            "text": f"demigorrgon's Referral request #{args[1]['id']} for $333.00",
                                         },
                                         "value": "value-7",
                                     },
                                     {
                                         "text": {
                                             "type": "plain_text",
-                                            "text": f"demigorrgon's Overtime request #{args[1].id} for $333.00",
+                                            "text": f"demigorrgon's Overtime request #{args[1]['id']} for $333.00",
                                         },
                                         "value": "value-4",
                                     },
@@ -987,14 +988,14 @@ def history_payload(*args):
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": f"demigorrgon's Referral request #{args[1].id} for $333.00",
+                                    "text": f"demigorrgon's Referral request #{args[1]['id']} for $333.00",
                                 },
                                 "value": "value-7",
                             },
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": f"demigorrgon's Overtime request #{args[1].id} for $333.00",
+                                    "text": f"demigorrgon's Overtime request #{args[1]['id']} for $333.00",
                                 },
                                 "value": "value-4",
                             },
@@ -1018,7 +1019,7 @@ def approve_button_payload(*args):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -1092,7 +1093,7 @@ def approve_button_payload(*args):
                             "elements": [
                                 {
                                     "type": "button",
-                                    "action_id": f"approve_id_{args[1].id}",
+                                    "action_id": f"approve_id_{args[1]['id']}",
                                     "text": {
                                         "type": "plain_text",
                                         "text": "Approve",
@@ -1102,7 +1103,7 @@ def approve_button_payload(*args):
                                 },
                                 {
                                     "type": "button",
-                                    "action_id": f"reject_id_{args[1].id}",
+                                    "action_id": f"reject_id_{args[1]['id']}",
                                     "text": {
                                         "type": "plain_text",
                                         "text": "Reject",
@@ -1118,7 +1119,7 @@ def approve_button_payload(*args):
                 "response_url": "https://hooks.slack.com/actions/T03MJUGC8HK/3798319245062/tWgHGp4blTe43drlRy8RunN4",
                 "actions": [
                     {
-                        "action_id": f"approve_id_{args[1].id}",
+                        "action_id": f"approve_id_{args[1]['id']}",
                         "block_id": "jAh9U",
                         "text": {
                             "type": "plain_text",
@@ -1142,7 +1143,7 @@ def reject_button_payload(*args):
                 "type": "block_actions",
                 "user": {
                     "id": "U03MF8E81T8",
-                    "username": args[0].username,
+                    "username": args[0]["username"],
                     "name": "demigorrgon",
                     "team_id": "T03MJUGC8HK",
                 },
@@ -1241,7 +1242,7 @@ def reject_button_payload(*args):
                 "response_url": "https://hooks.slack.com/actions/T03MJUGC8HK/3828744065760/DhbtUMW6xJMUISK7TR4TfZDn",
                 "actions": [
                     {
-                        "action_id": f"reject_id_{args[1].id}",
+                        "action_id": f"reject_id_{args[1]['id']}",
                         "block_id": "hub",
                         "text": {
                             "type": "plain_text",
