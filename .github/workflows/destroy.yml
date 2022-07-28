@@ -8,10 +8,7 @@ name: Destroy
 #
 
 
-on:
-  workflow_dispatch:
-       branches:
-         - LAN-85-Deploy-Application
+on: [workflow_dispatch]
 
 jobs:
   destroy:
