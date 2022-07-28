@@ -23,7 +23,7 @@ services:
       - SIGNING_SECRET=${SIGNING_SECRET}
       - BOT_USER_OAUTH_TOKEN=${BOT_USER_OAUTH_TOKEN}
     volumes:
-       - ./frontend_vol:/app/
+       - /home/ubuntu/frontend_vol:/app/
     ports:
       - 8000:8000
     depends_on:
@@ -40,7 +40,7 @@ services:
       - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - POSTGRES_HOST=postgresdb
     volumes:
-      - ./backend_vol:/app/
+      - /home/ubuntu/backend_vol:/app/
     ports:
       - 8001:8001
     depends_on:
