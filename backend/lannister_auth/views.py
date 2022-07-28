@@ -30,7 +30,7 @@ class RegisterUser(CreateAPIView):
                 first_name=user_data.get("first_name"),
                 last_name=user_data.get("last_name"),
             )
-            user.roles.set([2, 3])
+            user.roles.set(["Reviewer", "Worker"])
             user.save()
             return Response(
                 {
@@ -46,7 +46,7 @@ class RegisterUser(CreateAPIView):
             last_name=user_data.get("last_name"),
         )
         if not user_data.get("roles"):
-            user.roles.add(Role.objects.get(id=3))
+            user.roles.add(Role.objects.get(name="Worker"))
             user.save()
         return Response(
             {
