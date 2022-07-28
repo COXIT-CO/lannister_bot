@@ -1,13 +1,6 @@
 from rest_framework import serializers
-from lannister_auth.models import LannisterUser, Role
-
-
-class RoleSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source="get_id_display")
-
-    class Meta:
-        model = Role
-        fields = ("name",)
+from lannister_auth.models import LannisterUser
+from lannister_roles.serializers import RoleSerializer
 
 
 class WorkerSerializer(serializers.ModelSerializer):
