@@ -19,12 +19,12 @@ provisioner "file" {
 
 provisioner "file" {
   source      = "${path.root}/../backend" #provide neccesary files
-  destination = "/tmp/backend_vol" #destination of files
+  destination = "/tmp/backend" #destination of files
 }
 
 provisioner "file" {
   source      = "${path.root}/../frontend" #provide neccesary files
-  destination = "/tmp/frontend_vol" #destination of files
+  destination = "/tmp/frontend" #destination of files
 }
 
 provisioner "file" {
@@ -54,7 +54,7 @@ provisioner "file" {
 provisioner "remote-exec" {
          inline = [
                     "export $(grep -v '^#' .env | xargs -0) && echo $POSTGRES_USER",
-                    "sudo mv -v /tmp/backend_vol /tmp/frontend_vol ~",
+                    "sudo mv -v /tmp/backend /tmp/frontend ~",
                     "chmod +x /tmp/install-docker.sh",
                     "/tmp/install-docker.sh",
                     "sudo docker login --username=${var.docker_user} --password=${var.docker_token}",
