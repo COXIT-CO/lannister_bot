@@ -13,9 +13,11 @@ from lannister_slack.views import (
     ListUsersCommandView,
     BonusRequestHistoryView,
     ListReviewableRequests,
+    # respond_to_challenge,
 )
 
 urlpatterns = [
+    # path("events", respond_to_challenge, name="slack-events"),
     path("events", SlackEventView.as_view(), name="slack-events"),
     path("interactives", InteractivesHandler.as_view(), name="interactives"),
     path("register", RegisterUserCommandView.as_view(), name="register-in-slack"),
