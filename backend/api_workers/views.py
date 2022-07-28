@@ -5,6 +5,7 @@ from lannister_requests.models import BonusRequest
 from .serializers import WorkerSerializer
 from lannister_requests.serializers import BonusRequestBaseSerializer
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import MultipleObjectsReturned
 
 
 class ListWorkers(generics.ListCreateAPIView):
@@ -26,10 +27,24 @@ class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
         """
         Parsing object by model id or slack_channel_id
         """
+        print(self.kwargs)
         if self.kwargs.get("pk"):
             return get_object_or_404(LannisterUser, id=self.kwargs.get("pk"))
+        if self.kwargs.get("username"):
+            return get_object_or_404(
+                LannisterUser, username=self.kwargs.get("username")
+            )
 
-        return get_object_or_404(LannisterUser, username=self.kwargs.get("username"))
+        # handles events from slack, they're mad buggy
+        if self.kwargs.get("channel_id"):
+            try:
+                return get_object_or_404(
+                    LannisterUser, slack_channel_id=self.kwargs.get("channel_id")
+                )
+            except (MultipleObjectsReturned, ValueError):  # only for debug/showcase
+                return LannisterUser.objects.filter(
+                    slack_channel_id=self.kwargs.get("channel_id")
+                ).first()
 
     def patch(self, request, *args, **kwargs):
         """
@@ -38,7 +53,20 @@ class DetailWorker(generics.RetrieveUpdateDestroyAPIView):
         """
         data = request.data
         user = LannisterUser.objects.get(username=self.kwargs.get("username"))
-        provided_role = Role.objects.get(id=data.get("role"))
+
+        if (
+            data.get("slack_channel_id") and len(data) == 1
+        ):  # /register request comes here
+            user.slack_channel_id = data.get("slack_channel_id")
+            user.save()
+            return Response(status=status.HTTP_200_OK)
+
+        if data.get("slack_user_id") and len(data) == 1:  # /register request comes here
+            user.slack_user_id = data.get("slack_user_id")
+            user.save()
+            return Response(status=status.HTTP_200_OK)
+
+        provided_role = Role.objects.get(name=data.get("role"))
         user.roles.remove(provided_role)
         return Response(
             data={"response": "User was unassigned successfully"},
