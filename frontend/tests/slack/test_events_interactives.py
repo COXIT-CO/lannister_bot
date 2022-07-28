@@ -14,8 +14,6 @@ from tests.slack.payload_helpers import (
     remove_reviewer_payload,
 )
 
-pytestmark = [pytest.mark.django_db]
-
 
 def test_help_message_event(frontend_api_client, mocker):
     url = reverse("slack-events")

@@ -3,7 +3,6 @@ import pytest
 from slack_sdk.errors import SlackApiError
 from django.urls import reverse
 
-pytestmark = [pytest.mark.django_db]
 
 """
     user_name parameter should be passed as first key and this spelling is default by slack, so pass it like that
