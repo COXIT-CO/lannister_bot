@@ -52,7 +52,3 @@ jobs:
           coverage run -m pytest frontend/tests/
           coverage report
           coveralls
-      - name: Coveralls report
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GH_TOKEN }}
