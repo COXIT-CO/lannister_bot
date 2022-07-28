@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from lannister_auth.models import LannisterUser, Role
@@ -18,13 +18,8 @@ class BonusRequestStatus(models.Model):
 
 
 def set_request_status():
-    """create new statuses. Get default status"""
-    BonusRequestStatus.objects.get_or_create(status_name="Created")
-    BonusRequestStatus.objects.get_or_create(status_name="Approved")
-    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
-    BonusRequestStatus.objects.get_or_create(status_name="Done")
-    default = BonusRequestStatus.objects.get(status_name="Created")
-    return default.pk
+    """Get default status"""
+    return BonusRequestStatus.objects.get_or_create(status_name="Created")[0]
 
 
 class BonusRequest(models.Model):
@@ -46,12 +41,16 @@ class BonusRequest(models.Model):
     description = models.CharField(max_length=255, blank=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    price_usd = models.DecimalField(max_digits=10, decimal_places=3, null=True)
-    payment_date = models.DateTimeField(null=True)
+    price_usd = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True
+    )
+    payment_date = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        if not self.reviewer:
+            raise ValueError(_("You must add reviewer."))
         reviewer = LannisterUser.objects.get(username=self.reviewer.username)
-        is_reviewer = Role.objects.get(id=2) in reviewer.roles.all()
+        is_reviewer = Role.objects.get(name="Reviewer") in reviewer.roles.all()
         if not is_reviewer:
             raise ValueError(
                 _(
@@ -110,3 +109,11 @@ def add_status_to_history(sender, created, instance, *args, **kwargs):
             status=instance.status,
             updated_at=instance.updated_at,
         )
+
+
+@receiver(pre_save, sender=LannisterUser)
+def create_roles(sender, instance, *args, **kwargs):
+    BonusRequestStatus.objects.get_or_create(status_name="Created")
+    BonusRequestStatus.objects.get_or_create(status_name="Approved")
+    BonusRequestStatus.objects.get_or_create(status_name="Rejected")
+    BonusRequestStatus.objects.get_or_create(status_name="Done")

@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "lannister_auth",
     "api_workers",
+    "lannister_roles",
     "lannister_requests",
     # 3rd party
     "rest_framework",

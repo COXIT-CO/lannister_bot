@@ -13,6 +13,7 @@ urlpatterns = [
                 path("auth/", include("lannister_auth.urls")),
                 path("workers/", include("api_workers.urls")),
                 path("requests/", include("lannister_requests.urls")),
+                path("roles/", include("lannister_roles.urls")),
                 path(
                     "schema",
                     get_schema_view(

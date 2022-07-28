@@ -7,6 +7,8 @@ from django.contrib.auth.models import (
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import pre_save
 from django.utils.translation import gettext_lazy as _
+from lannister_roles.models import Role
+from django.dispatch import receiver
 
 
 class BaseManager(BaseUserManager):
@@ -48,30 +50,9 @@ class LannisterUserManager(BaseManager):
         return user
 
 
-class Role(models.Model):
-    """
-    Roles could be implemented with is_staff and is_superuser but it depends on schema.
-    If we'll want to scale aka add another user type, we'll have to do something similar anyway.
-    """
-
-    objects = BaseUserManager()
-
-    ADMIN = 1
-    REVIEWER = 2
-    WORKER = 3
-
-    USER_ROLE_CHOISES = (
-        (ADMIN, _("Administrator")),
-        (REVIEWER, _("Reviewer")),
-        (WORKER, _("Worker")),
-    )
-
-    id = models.PositiveSmallIntegerField(choices=USER_ROLE_CHOISES, primary_key=True)
-    users = models.ManyToManyField("LannisterUser")
-    description = models.CharField(max_length=128, null=True)
-
-    def __str__(self):
-        return self.get_id_display()
+def set_user_role():
+    """Get default status"""
+    return Role.objects.get_or_create(name="Worker")
 
 
 class LannisterUser(AbstractBaseUser, PermissionsMixin):
@@ -83,7 +64,7 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
     slack_channel_id = models.CharField(max_length=100, blank=True, null=True)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    roles = models.ManyToManyField(Role)
+    roles = models.ManyToManyField(Role, default=set_user_role)
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email", "first_name", "last_name"]
 
@@ -96,10 +77,9 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
         self.first_name = self.first_name.capitalize()
         self.last_name = self.last_name.capitalize()
         if self.is_superuser:
-            self.roles.add(Role.objects.get(id=1))
-            self.roles.add(Role.objects.get(id=2))
-            self.roles.add(Role.objects.get(id=3))
-
+            self.roles.add(Role.objects.get(name="Administrator"))
+            self.roles.add(Role.objects.get(name="Reviewer"))
+            self.roles.add(Role.objects.get(name="Worker"))
         super().save(*args, **kwargs)
 
     @property
@@ -115,10 +95,8 @@ class LannisterUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "Lannister Users"
 
 
+@receiver(pre_save, sender=LannisterUser)
 def create_roles(sender, instance, *args, **kwargs):
-    Role.objects.get_or_create(id=1)
-    Role.objects.get_or_create(id=2)
-    Role.objects.get_or_create(id=3)
-
-
-pre_save.connect(create_roles, sender=LannisterUser)
+    Role.objects.get_or_create(name="Administrator")
+    Role.objects.get_or_create(name="Reviewer")
+    Role.objects.get_or_create(name="Worker")
