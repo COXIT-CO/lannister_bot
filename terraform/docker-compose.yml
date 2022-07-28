@@ -1,5 +1,14 @@
 version: '3'
 services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      - .default.conf:/etc/nginx/conf.d/default.conf
+
+    depends_on:
+      - lannister-frontend
 
   lannister-frontend:
     image: ${FRONTEND_DOCKER_IMAGE}
@@ -14,7 +23,7 @@ services:
       - SIGNING_SECRET=${SIGNING_SECRET}
       - BOT_USER_OAUTH_TOKEN=${BOT_USER_OAUTH_TOKEN}\
     volumes:
-      - ./frontend/:/app/
+       - frontend_vol:/app/
     ports:
       - 8000:8000
     depends_on:
@@ -31,7 +40,7 @@ services:
       - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - POSTGRES_HOST=postgresdb
     volumes:
-      - ./backend/:/app/
+      - backend:/app/
     ports:
       - 8001:8001
     depends_on:
@@ -51,7 +60,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - 5433:5433
+      - 5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data/
 
