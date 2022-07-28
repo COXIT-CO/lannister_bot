@@ -24,7 +24,7 @@ provisioner "file" {
 
 provisioner "file" {
   source      = "${path.root}/../frontend" #provide neccesary files
-  destination = "/tmp/frontend" #destination of files
+  destination = "/tmp/frontend_vol" #destination of files
 }
 
 provisioner "file" {
@@ -43,10 +43,18 @@ provisioner "file" {
    })
 }
 
+provisioner "file" {
+  destination = ".default.conf" #destination of files
+  content = templatefile("${path.module}/default.conf.tftpl",
+  {
+    server_ip = aws_instance.app_server.public_ip
+   })
+}
+
 provisioner "remote-exec" {
          inline = [
                     "export $(grep -v '^#' .env | xargs -0) && echo $POSTGRES_USER",
-                    "sudo mv -v /tmp/backend /tmp/frontend ~",
+                    "sudo mv -v /tmp/backend /tmp/frontend_vol ~",
                     "chmod +x /tmp/install-docker.sh",
                     "/tmp/install-docker.sh",
                     "sudo docker login --username=${var.docker_user} --password=${var.docker_token}",
