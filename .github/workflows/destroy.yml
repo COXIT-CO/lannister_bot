@@ -46,7 +46,7 @@ jobs:
           TF_VAR_ssh_access_key: ${{ secrets.SSH_PUBLIC_KEY }} #SSH public secret key
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run:  cd terraform && terraform init -var="" -backend-config="bucket=${{ secrets.BUCKET_NAME }}"
+        run:  cd terraform && terraform init -var="" -backend-config="bucket=${{ secrets.BUCKET_NAME }}" -backend-config="region=${{ secrets.TERRAFORM_REGION }}"
 
 
       - name: Destroy #always destroy cuz using AWS FREE TIER
