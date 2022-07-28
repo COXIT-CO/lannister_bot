@@ -81,11 +81,10 @@ DATABASES = {
         "NAME": os.getenv("DB_NAME"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": "localhost",  # hide later
+        "HOST": os.getenv("POSTGRES_HOST"),
         "PORT": "5432",
     }
 }
-
 if os.environ.get("GITHUB_WORKFLOW"):
     DATABASES = {
         "default": {
