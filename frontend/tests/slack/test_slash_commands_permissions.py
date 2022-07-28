@@ -192,15 +192,20 @@ def test_edit_request_by_non_workspace_user(
 #     frontend_api_client, reviewer_user_mock, bonus_request_mock, mocker
 # ):
 #     url = reverse("review-request")
-#     reviewer_user = mocker.patch("requests.get")
-#     roles = mocker.patch.dict(
-#         reviewer_user_mock, {"roles": [{"name": "Reviewer"}, {"name": "Worker"}]}
+#     # reviewer_mock = mocker.Mock(
+#     #     return_value=Mock(status_code=200, json=reviewer_user_mock)
+#     # )
+#     # bonus_request_mock_obj = mocker.Mock(
+#     #     return_value=Mock(status_code=200, json=[bonus_request_mock])
+#     # )
+#     # assert reviewer_mock.json.return_value == reviewer_user_mock
+#     mocks = mocker.patch(
+#         "requests.get", side_effects=[reviewer_user_mock, bonus_request_mock]
 #     )
-#     reviewer_user.return_value.json.return_value = roles
-#     print(reviewer_user)
-#     # request_to_review = mocker.patch("requests.get")
-#     # request_to_review.return_value.json.return_value = [bonus_request_mock]
-#     mocker.patch("requests.get")
+#     print(mocks[0], mocks[1])
+#     # reviewer = mocker.patch("requests.get", )
+#     # reviewer.return_value.json.return_value = reviewer_user_mock
+#     assert isinstance(reviewer_user_mock, dict)
 #     response = frontend_api_client.post(
 #         url,
 #         {
@@ -434,8 +439,12 @@ def test_history_access_non_workspace_user(
 #     assert response.status_code == 200
 
 
-# def test_list_requests_to_review(frontend_api_client, reviewer_user_mock):
+# def test_list_requests_to_review(
+#     frontend_api_client, reviewer_user_mock, bonus_request_mock, mocker
+# ):
 #     url = reverse("list-requests-to-review")
+#     mocker.patch("requests.get").return_value.json.return_value = reviewer_user_mock
+#     mocker.patch("requests.get").return_value.json.return_value = [bonus_request_mock]
 
 #     response = frontend_api_client.post(
 #         url,
