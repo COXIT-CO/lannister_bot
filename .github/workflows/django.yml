@@ -45,8 +45,9 @@ jobs:
         uses: codecov/codecov-action@v2
 
       - name: Run Frontend Tests
+        env:
+          BOT_USER_OAUTH_TOKEN: ${{ secrets.BOT_USER_OAUTH_TOKEN }}
         run: |
-
           coverage run -m pytest frontend/tests/
           coverage report
           coveralls
