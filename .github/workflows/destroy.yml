@@ -9,7 +9,9 @@ name: Destroy
 
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
+       branches:
+         - LAN-85-Deploy-Application
 
 jobs:
   destroy:
