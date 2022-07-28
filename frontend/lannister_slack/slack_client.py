@@ -1,6 +1,7 @@
 import os
 from slack_sdk import WebClient
 
+print(os.environ.get("GITHUB_WORKFLOW"))
 if os.environ.get("GITHUB_WORKFLOW"):
     bot_user_token = os.environ.get("BOT_USER_OAUTH_TOKEN")
     print("bot token:" + f"{bot_user_token}")
