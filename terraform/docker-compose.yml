@@ -21,7 +21,7 @@ services:
       - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - CLIENT_SECRET=${CLIENT_SECRET}
       - SIGNING_SECRET=${SIGNING_SECRET}
-      - BOT_USER_OAUTH_TOKEN=${BOT_USER_OAUTH_TOKEN}\
+      - BOT_USER_OAUTH_TOKEN=${BOT_USER_OAUTH_TOKEN}
     volumes:
        - frontend_vol:/app/
     ports:
