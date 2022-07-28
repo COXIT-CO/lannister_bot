@@ -1,0 +1,59 @@
+version: '3'
+services:
+
+  lannister-frontend:
+    image: ${FRONTEND_DOCKER_IMAGE}
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgresdb
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - SIGNING_SECRET=${SIGNING_SECRET}
+      - BOT_USER_OAUTH_TOKEN=${BOT_USER_OAUTH_TOKEN}\
+    volumes:
+      - ./frontend/:/app/
+    ports:
+      - 8000:8000
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+
+  lannister-backend:
+    image: ${BACKEND_DOCKER_IMAGE}
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - POSTGRES_HOST=postgresdb
+    volumes:
+      - ./backend/:/app/
+    ports:
+      - 8001:8001
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+
+  postgresdb:
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DATABASE}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 5433:5433
+    volumes:
+      - pgdata:/var/lib/postgresql/data/
+
+volumes:
+  pgdata:

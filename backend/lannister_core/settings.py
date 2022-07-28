@@ -78,10 +78,10 @@ WSGI_APPLICATION = "lannister_core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": os.getenv("DB_NAME"),
+        "NAME": os.getenv("POSTGRES_DATABASE"),
         "USER": os.getenv("POSTGRES_USER"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": "localhost",  # hide later
+        "HOST": os.getenv("POSTGRES_HOST"),  # hide later
         "PORT": "5432",
     }
 }
