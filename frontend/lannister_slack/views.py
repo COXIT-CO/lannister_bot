@@ -77,7 +77,7 @@ class SlackEventView(APIView):
         if event["type"] == "message":
             if BOT_ID != event.get("user"):
                 requesting_user = requests.get(
-                    f"{settings.BASE_BACKEND_URL}workers/{channel_id}/"
+                    f"{settings.BASE_BACKEND_URL}workers/detail/{channel_id}"
                 )
 
                 if event.get("text") in ["help", "Help", "HELP", "hELP"]:
@@ -93,20 +93,23 @@ class SlackEventView(APIView):
                         )  # has to return 200 cuz https://api.slack.com/apis/connections/events-api#the-events-api__responding-to-events
                     else:
                         first_part_bot_message = BotMessage(
-                            channel=channel_id, username=requesting_user.get("username")
+                            channel=channel_id,
+                            username=requesting_user.json().get("username"),
                         )
                         # scuffed pagination thanks to slack's limit of 10 messages
                         slack_client.chat_postMessage(
                             **first_part_bot_message.help_message_first_five()
                         )
                         second_part_bot_message = BotMessage(
-                            channel=channel_id, username=requesting_user.get("username")
+                            channel=channel_id,
+                            username=requesting_user.json().get("username"),
                         )
                         slack_client.chat_postMessage(
                             **second_part_bot_message.next_five_messages()
                         )
                         bot_message = BotMessage(
-                            channel=channel_id, username=requesting_user.get("username")
+                            channel=channel_id,
+                            username=requesting_user.json().get("username"),
                         )
                         slack_client.chat_postMessage(
                             **bot_message.base_styled_message(
@@ -382,7 +385,7 @@ class InteractivesHandler(APIView):
 
                         get_reviewers_channel_id = requests.get(
                             url=BASE_BACKEND_URL
-                            + f"workers/detail/{selected_reviewer_username}",
+                            + f"workers/detail/{selected_reviewer_username}/",
                             headers=FRONTEND_HEADER,
                         ).json()
                         message_reviewer = BotMessage(
@@ -461,7 +464,7 @@ class InteractivesHandler(APIView):
                     patch_users_role = requests.patch(
                         url=BASE_BACKEND_URL
                         + f"workers/detail/{selected_username_to_unassign}/",
-                        json={"role": 2},
+                        json={"role": "Reviewer"},
                         headers=FRONTEND_HEADER,
                     )
                     if patch_users_role.status_code == 200:
@@ -493,12 +496,12 @@ class InteractivesHandler(APIView):
 
             if action_id == "confirm_register":
                 user_data = requests.patch(
-                    url=BASE_BACKEND_URL + "workers/" + username + "/",
+                    url=BASE_BACKEND_URL + "workers/detail/" + username + "/",
                     json={"slack_user_id": loads.get("user").get("id")},
                 )
                 if user_data.status_code != 200:
                     raise Exception(
-                        "Error when confirming register. Is backend server running at 8000 port?"
+                        "Error when confirming register. Is backend server running at 8001 port?"
                     )
                 bot_message = BotMessage(channel=channel_id, username=username)
                 slack_client.chat_postMessage(
@@ -674,7 +677,7 @@ class RegisterUserCommandView(APIView):
         print(prettify_json(request.data))
         username = request.data.get("user_name", None)
         channel_id = request.data.get("channel_id", None)
-        # user = LannisterUser.objects.get(username=username)
+        # user_id = request.data.get("user_id")
         user_data = requests.get(
             settings.BASE_BACKEND_URL + f"workers/detail/{username}"
         ).json()
@@ -690,10 +693,10 @@ class RegisterUserCommandView(APIView):
         # instead of manually typing it out all the time
         else:
             update_slack_ids = requests.patch(
-                url=f"{settings.BASE_BACKEND_URL}workers/{username}/",
+                url=f"{settings.BASE_BACKEND_URL}workers/detail/{username}/",
                 json={"slack_channel_id": channel_id, "slack_user_id": None},
-            ).json()
-            print(update_slack_ids)
+            )
+            print(update_slack_ids.status_code)
             slack_client.chat_postMessage(**bot_message.register())
             return Response(
                 status=status.HTTP_201_CREATED,
@@ -809,9 +812,9 @@ class ReviewRequestCommandView(APIView):
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
         user_data = requests.get(
-            url=BASE_BACKEND_URL + f"workers/detail/{username}"
+            url=BASE_BACKEND_URL + f"workers/detail/{username}/"
         ).json()
-        is_reviewer = {"name": "Reviewer"} in user_data["roles"]
+        is_reviewer = any(item.get("name") == "Reviewer" for item in user_data["roles"])
         if is_reviewer:
             message = MessageWithDropdowns(channel, username)
             try:
@@ -841,31 +844,12 @@ class AddReviewerCommandView(APIView):
         username = request.data.get("user_name", None)
         channel = request.data.get("channel_id", None)
 
-        # if HANGING_INPUT_FIELD:
-        #     notify_user_about_hanging_field(channel=channel)
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
-
         reviewers_list = MessageWithDropdowns(
             channel=channel,
             username=username,
         )
         slack_client.chat_postMessage(**reviewers_list.assign_reviewer())
         return Response(status=status.HTTP_200_OK)
-        # if len(LannisterUser.objects.filter(roles__in=[2])) > 0:
-        #     bonus_request = BonusRequest.objects.filter(creator__username=username)
-        #     reviewers_list = MessageWithDropdowns(
-        #         channel=channel,
-        #         username=username,
-        #         queryset=bonus_request,
-        #     )
-        #     slack_client.chat_postMessage(**reviewers_list.assign_reviewer())
-        #     return Response(status=status.HTTP_200_OK)
-
-        # bot_message = BotMessage(channel, username)
-        # slack_client.chat_postMessage(
-        #     **bot_message.base_styled_message("*No reviewers added to lannister yet*\n")
-        # )
-        # return Response(status=status.HTTP_200_OK)
 
 
 class RemoveReviewerCommandView(APIView):
@@ -877,9 +861,14 @@ class RemoveReviewerCommandView(APIView):
         username = request.data.get("user_name")
         # TODO: refactor into helper function | same with roles
         get_current_user = requests.get(
-            url=BASE_BACKEND_URL + f"workers/detail/{username}", headers=FRONTEND_HEADER
+            url=BASE_BACKEND_URL + f"workers/detail/{username}/",
+            headers=FRONTEND_HEADER,
         ).json()
-        if {"name": "Administrator"} in get_current_user.get("roles"):
+        is_admin = any(
+            item.get("name") == "Administrator" for item in get_current_user["roles"]
+        )
+
+        if is_admin:
             message = MessageWithDropdowns(channel=channel_id, username=username)
             slack_client.chat_postMessage(**message.remove_reviewer_role_from_user())
             return Response(status=status.HTTP_200_OK)
@@ -917,12 +906,14 @@ class BonusRequestHistoryView(APIView):
         print(prettify_json(request.data))
         channel_id = request.data.get("channel_id")
         username = request.data.get("user_name")
-        admin_role = {"name": "Administrator"}
+
         current_user_role = requests.get(
-            url=BASE_BACKEND_URL + f"workers/detail/{username}"
+            url=BASE_BACKEND_URL + f"workers/detail/{username}/"
         ).json()
-        print(current_user_role)
-        if admin_role in current_user_role.get("roles"):
+        is_admin = is_admin = any(
+            item.get("name") == "Administrator" for item in current_user_role["roles"]
+        )
+        if is_admin:
             bot_message = MessageWithDropdowns(channel=channel_id, username=username)
             slack_client.chat_postMessage(**bot_message.history_dropdown())
             return Response(status=status.HTTP_200_OK)
@@ -939,10 +930,11 @@ class ListReviewableRequests(APIView):
         channel_id = request.data.get("channel_id")
         username = request.data.get("user_name")
         reviewer = requests.get(
-            url=BASE_BACKEND_URL + f"workers/detail/{username}", headers=FRONTEND_HEADER
+            url=BASE_BACKEND_URL + f"workers/detail/{username}/",
+            headers=FRONTEND_HEADER,
         ).json()
-        reviewer_data = {"name": "Reviewer"}
-        if reviewer_data in reviewer.get("roles"):
+        is_reviewer = any(item.get("name") == "Reviewer" for item in reviewer["roles"])
+        if is_reviewer:
             all_reviewable_bonus_requests = requests.get(
                 url=BASE_BACKEND_URL + f"requests/?reviewer={username}&reviewable=true",
                 headers=FRONTEND_HEADER,
