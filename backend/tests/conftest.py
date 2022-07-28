@@ -16,17 +16,17 @@ def dummy_user(django_user_model):
 
 @pytest.fixture
 def admin_role():
-    return Role.objects.get_or_create(id=1)[0]
+    return Role.objects.get_or_create(name="Administrator")[0]
 
 
 @pytest.fixture
 def reviewer_role():
-    return Role.objects.get_or_create(id=2)[0]
+    return Role.objects.get_or_create(name="Reviewer")[0]
 
 
 @pytest.fixture
 def worker_role():
-    return Role.objects.get_or_create(id=3)[0]
+    return Role.objects.get_or_create(name="Worker")[0]
 
 
 @pytest.fixture
