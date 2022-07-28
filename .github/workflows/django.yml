@@ -46,6 +46,7 @@ jobs:
 
       - name: Run Frontend Tests
         env:
+          SECRET_KEY: ${{secrets.SECRET_KEY}}
           BOT_USER_OAUTH_TOKEN: ${{ secrets.BOT_USER_OAUTH_TOKEN }}
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
