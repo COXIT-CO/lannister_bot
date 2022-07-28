@@ -202,7 +202,6 @@ class InteractivesHandler(APIView):
                     },
                     headers=settings.CUSTOM_FRONTEND_HEADER,
                 )
-                print(new_bonus_request.json())
                 find_reviewer_to_notify = requests.get(
                     url=f"{BASE_BACKEND_URL}workers/detail/{provided_reviewer}",
                     headers=FRONTEND_HEADER,
@@ -662,14 +661,6 @@ class InteractivesHandler(APIView):
             return Response(status=status.HTTP_200_OK)
 
 
-#         return Response(status=status.HTTP_200_OK)
-
-
-"""
-TODO: refactor views by making base view (CommandView or smtng) which will store all the channel/user/text data and inherits from APIView or any other generic
-"""
-
-
 class RegisterUserCommandView(APIView):
     """
     Handler for '/register command'
@@ -911,7 +902,6 @@ class ListUsersCommandView(APIView):
             url=BASE_BACKEND_URL + f"workers/detail/{username}", headers=FRONTEND_HEADER
         ).json()
         message = BotMessage(channel=channel_id, username=username)
-
         if {"name": "Administrator"} in get_current_user.get("roles"):
             slack_client.chat_postMessage(**message.list_users())
             return Response(status=status.HTTP_200_OK)
