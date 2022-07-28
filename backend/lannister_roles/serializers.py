@@ -5,5 +5,5 @@ from lannister_roles.models import Role
 class RoleSerializer(ModelSerializer):
     class Meta:
         model = Role
-        fields = ['name', 'description']
+        fields = ["name", "description"]
         read_only_fields = ["name"]
