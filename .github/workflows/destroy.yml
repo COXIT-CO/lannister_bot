@@ -1,0 +1,73 @@
+name: Destroy
+
+
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#
+
+
+on:
+  workflow_dispatch
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: 'read'
+        id-token: 'write'
+    steps:
+      - name: Setup Terraform
+        run: |
+          wget https://releases.hashicorp.com/terraform/0.12.24/terraform_0.12.24_linux_amd64.zip
+          unzip terraform_0.12.24_linux_amd64.zip
+          sudo mv terraform /usr/bin/
+          terraform version
+
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Init
+        env:
+          TF_VAR_terraform_region: ${{ secrets.TERRAFORM_REGION }}
+          TF_VAR_bucket_name: ${{ secrets.BUCKET_NAME }}
+          TF_VAR_ssh_key_name: ${{ secrets.SSH_KEY_NAME }}
+          TF_VAR_docker_user: ${{ secrets.DOCKER_USER }}
+          TF_VAR_docker_token: ${{ secrets.DOCKER_TOKEN }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_postgres_user: ${{ secrets.POSTGRES_USER }}
+          TF_VAR_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}
+          TF_VAR_db_name: ${{ secrets.POSTGRES_DATABASE }}
+          TF_VAR_client_secret: ${{ secrets.CLIENT_SECRET }}
+          TF_VAR_signing_secret: ${{ secrets.SIGNING_SECRET }}
+          TF_VAR_bot_user_oauth_token: ${{ secrets.BOT_USER_OAUTH_TOKEN }}
+          TF_VAR_frontend_docker_image: ${{ secrets.DOCKER_USER }}/${{ secrets.DOCKER_REPO }}:${{ secrets.FRONTEND_IMAGE_NAME }} #do this for all images
+          TF_VAR_backend_docker_image: ${{ secrets.DOCKER_USER }}/${{ secrets.DOCKER_REPO }}:${{ secrets.BACKEND_IMAGE_NAME }}
+          TF_VAR_ssh_access_key: ${{ secrets.SSH_PUBLIC_KEY }} #SSH public secret key
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run:  cd terraform && terraform init -var="" -backend-config="bucket=${{ secrets.BUCKET_NAME }}"
+
+
+      - name: Destroy #always destroy cuz using AWS FREE TIER
+        if: always()
+        env:
+          TF_VAR_terraform_region: ${{ secrets.TERRAFORM_REGION }}
+          TF_VAR_docker_user: ${{ secrets.DOCKER_USER }}
+          TF_VAR_docker_token: ${{ secrets.DOCKER_TOKEN }}
+          TF_VAR_bucket_name: ${{ secrets.BUCKET_NAME }}
+          TF_VAR_ssh_key_name: ${{ secrets.SSH_KEY_NAME }}
+          TF_VAR_secret_key: ${{ secrets.SECRET_KEY }}
+          TF_VAR_postgres_user: ${{ secrets.POSTGRES_USER }}
+          TF_VAR_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}
+          TF_VAR_db_name: ${{ secrets.POSTGRES_DATABASE }}
+          TF_VAR_client_secret: ${{ secrets.CLIENT_SECRET }}
+          TF_VAR_signing_secret: ${{ secrets.SIGNING_SECRET }}
+          TF_VAR_bot_user_oauth_token: ${{ secrets.BOT_USER_OAUTH_TOKEN }}
+          TF_VAR_frontend_docker_image: ${{ secrets.DOCKER_USER }}/${{ secrets.DOCKER_REPO }}:${{ secrets.FRONTEND_IMAGE_NAME }} #do this for all images
+          TF_VAR_backend_docker_image: ${{ secrets.DOCKER_USER }}/${{ secrets.DOCKER_REPO }}:${{ secrets.BACKEND_IMAGE_NAME }}
+          TF_VAR_ssh_access_key: ${{ secrets.SSH_PUBLIC_KEY }} #SSH public secret key
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: cd terraform && terraform destroy -auto-approve
