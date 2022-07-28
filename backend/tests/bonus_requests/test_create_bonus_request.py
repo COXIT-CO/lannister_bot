@@ -1,5 +1,6 @@
 import pytest
-from lannister_requests.models import BonusRequestsHistory
+
+# from lannister_requests.models import BonusRequestsHistory
 
 pytestmark = [pytest.mark.django_db]
 
