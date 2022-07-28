@@ -1,0 +1,11 @@
+server {
+    listen 80;
+    server_name ${server_ip};
+    root /usr/share/nginx/html/;
+    location / {
+        proxy_pass http://lannister-frontend:8000;
+    }
+    location /api/ {
+        proxy_pass http://lannister-backend:8001;
+    }
+}
