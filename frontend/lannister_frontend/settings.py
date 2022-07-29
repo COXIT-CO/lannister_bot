@@ -45,12 +45,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "lannister_slack",
     "rest_framework",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -136,5 +138,11 @@ STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-BASE_BACKEND_URL = "http://127.0.0.1:8001/api/"
+BASE_BACKEND_URL = "http://18.184.0.151/api/"
 CUSTOM_FRONTEND_HEADER = {"X-Slack-Frontend": "slack-frontend-header"}
+
+CORS_ALLOWED_ORIGINS = [
+    "http://0.0.0.0:80",
+    "http://18.184.0.151:80",
+    "http://18.184.0.151",
+]
